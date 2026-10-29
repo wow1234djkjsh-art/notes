@@ -598,7 +598,7 @@ function renderMain() {
         <p class="m-hint">좋아요·플레이리스트는 이 브라우저에만 저장돼요. 다른 PC로 옮길 때 파일로 내보내고 가져오세요.</p>
         <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="margin:0;cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label></div>
         <h3>단축키</h3>
-        <p class="m-hint">Alt+M 음악 화면 · Ctrl+J 빠른 패널 · Ctrl+X 또는 Alt+K 긴급 탈출 · Esc 문서로 · Space 재생/정지 · V 영상</p>
+        <p class="m-hint">Alt+M 음악 화면 · Ctrl+J 빠른 패널 · Ctrl+X 또는 Alt+K 긴급 탈출 · [ 어디서나 재생/정지 · Esc 문서로 · Space 재생/정지 · V 영상</p>
       </div>`;
   }
   placePlayer();
@@ -810,6 +810,8 @@ window.addEventListener('keydown', e => {
   if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.code === 'KeyJ') { e.preventDefault(); toggleQuick(); return; }
   if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyK') { e.preventDefault(); panic(); return; }
   if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.code === 'KeyX') { e.preventDefault(); panic(); return; }
+  // [ 는 문서·음악 화면 어디서든 재생/정지 (검색창·제목 같은 입력칸에서는 그대로 입력)
+  if (e.code === 'BracketLeft' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); togglePlay(); return; }
   if (e.key === 'Escape') {
     if (!$('#menu').hidden) hideMenu();
     else if (quickOpen) toggleQuick(false);
