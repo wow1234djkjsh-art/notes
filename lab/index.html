@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>광고 실험</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d1d1f; --muted:#666; --line:#ddd; --accent:#e8603c; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.6 "Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:20px 16px 80px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin:14px 0; }
+  .muted { color:var(--muted); }
+  button { font:inherit; border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 12px; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+  button.ad { background:#d93025; color:#fff; border-color:#d93025; }
+  button.noad { background:#188038; color:#fff; border-color:#188038; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  #now { font-size:16px; font-weight:700; }
+  #visible { margin-top:12px; }
+  #visible iframe, #visible > div { width:640px; max-width:100%; aspect-ratio:16/9; height:auto; border:0; }
+  .hidden-player { position:fixed; bottom:0; left:0; width:1px; height:1px; opacity:0; pointer-events:none; border:0; }
+  table { border-collapse:collapse; width:100%; }
+  th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; }
+  code { background:#eef0f3; padding:1px 5px; border-radius:4px; }
+  #apiState { font-family:ui-monospace,monospace; font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>광고 실험</h1>
+  <p class="muted">순서대로 <b>[다음 실험 시작]</b> → 처음 15초 정도 소리를 듣고 → 결과 버튼 클릭. 광고는 보통 곡 시작 전에 나와요. 숨김 방식은 화면이 안 보이니 <b>소리로</b> 판단하세요.</p>
+
+  <div class="card">
+    <div id="now">대기 중</div>
+    <div id="desc" class="muted"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="next">다음 실험 시작</button>
+      <button id="stop">정지</button>
+      <span class="muted" id="progress"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="ad" data-r="ad">광고 나옴</button>
+      <button class="noad" data-r="noad">광고 안 나옴 (바로 노래)</button>
+      <button data-r="fail">재생 안 됨 / 오류</button>
+    </div>
+    <div id="apiState" class="muted" style="margin-top:8px"></div>
+    <div id="visible"></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><b>결과 요약</b> <span class="muted" id="origin"></span>
+      <button id="copy" style="margin-left:auto">결과 복사</button><button id="reset">기록 지우기</button></div>
+    <table id="summary"><thead><tr><th>방식</th><th>광고</th><th>안 나옴</th><th>오류</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card muted">
+    <b>방식 설명</b><br>
+    A: 주소만 넣은 iframe · 1px 숨김 · 자동재생 (원래 사이트와 동일)<br>
+    B: A + <code>enablejsapi=1</code><br>
+    C: IFrame Player API · 1px 숨김 · 자동재생 (앞/뒤 이동 가능한 방식)<br>
+    D: 640×360 보임 · 자동재생 없음 · 플레이어 직접 클릭 (대조군)<br>
+    E: IFrame Player API · 640×360 보임 · 자동재생 (영상 칸 시나리오)<br>
+    F: A + <code>start=60</code> (API 없이 위치 이동하는 대안)<br>
+    G: 실제 사이트와 똑같이 — <code>youtube-nocookie</code> IFrame API · 1px 숨김 · 빈 플레이어 만든 뒤 <code>loadVideoById</code><br>
+    H: <code>youtube-nocookie.com/embed</code> 주소만 iframe · 1px 숨김 · 자동재생
+  </div>
+</main>
+
+<script>
+const VIDEOS = [
+  ['dQw4w9WgXcQ', 'Rick Astley - Never Gonna Give You Up'],
+  ['9bZkp7q19f0', 'PSY - GANGNAM STYLE'],
+  ['JGwWNGJdvx8', 'Ed Sheeran - Shape of You'],
+  ['fJ9rUzIMcZQ', 'Queen - Bohemian Rhapsody'],
+  ['OPf0YbXqDm0', 'Mark Ronson - Uptown Funk'],
+  ['BzYnNdJhZQw', '아이유 - 밤편지 (1theK)'],
+];
+const MODES = {
+  A: '주소만 iframe · 1px 숨김 · 자동재생',
+  B: 'A + enablejsapi=1',
+  C: 'IFrame API · 1px 숨김 · 자동재생',
+  D: '640×360 보임 · 직접 클릭 재생 (대조군)',
+  E: 'IFrame API · 640×360 보임 · 자동재생',
+  F: 'A + start=60',
+  G: '실제 사이트 방식 (nocookie API · loadVideoById)',
+  H: 'nocookie 주소만 iframe · 1px 숨김 · 자동재생',
+};
+
+// D 먼저 2번으로 "이 환경에서 광고가 나오긴 하는지" 확인한 뒤, 나머지는 섞어서 진행
+function buildPlan() {
+  const rest = [];
+  for (const m of 'ABCEFGH') for (let i = 0; i < 2; i++) rest.push(m);
+  for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  return ['D', 'D', ...rest, 'D'].map((m, i) => ({ mode: m, vid: VIDEOS[i % VIDEOS.length] }));
+}
+
+let plan = buildPlan(), idx = -1, cur = null, ytPlayer = null, poll = null;
+const $ = s => document.querySelector(s);
+// GitHub Pages에는 기록 서버가 없으니 브라우저에 저장하고 [결과 복사]로 꺼낸다
+const KEY = 'lab-results';
+let results = [];
+try { results = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(results)); } catch (e) {} };
+
+let ytReady;
+const ytApi = new Promise(r => (ytReady = r));
+window.onYouTubeIframeAPIReady = () => ytReady();
+const s = document.createElement('script');
+s.src = 'https://www.youtube.com/iframe_api';
+document.head.appendChild(s);
+
+function stop() {
+  clearInterval(poll);
+  if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
+  document.querySelectorAll('.hidden-player').forEach(e => e.remove());
+  $('#visible').innerHTML = '';
+  $('#apiState').textContent = '';
+}
+
+function plainIframe(src, hidden) {
+  const f = document.createElement('iframe');
+  f.src = src;
+  f.allow = 'autoplay; encrypted-media';
+  if (hidden) { f.className = 'hidden-player'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true'); document.body.appendChild(f); }
+  else { f.allowFullscreen = true; $('#visible').appendChild(f); }
+}
+
+async function apiPlayer(id, hidden, site) {
+  await ytApi;
+  const host = document.createElement('div');
+  if (hidden) { host.className = 'hidden-player'; document.body.appendChild(host); }
+  else $('#visible').appendChild(host);
+  // site: 실제 사이트처럼 nocookie 호스트로 빈 플레이어를 만들고 준비되면 곡을 넣는다
+  ytPlayer = new YT.Player(host, site ? {
+    host: 'https://www.youtube-nocookie.com',
+    width: 1, height: 1,
+    playerVars: { playsinline: 1, rel: 0, autoplay: 1 },
+    events: { onReady: e => e.target.loadVideoById(id) },
+  } : {
+    videoId: id,
+    width: hidden ? 1 : 640, height: hidden ? 1 : 360,
+    playerVars: { autoplay: 1, playsinline: 1 },
+    events: { onReady: e => e.target.playVideo() },
+  });
+  if (hidden) ytPlayer.getIframe().className = 'hidden-player';
+  // 광고 중에는 본편 currentTime이 0에 머무는 경우가 있어 참고용으로 표시
+  poll = setInterval(() => {
+    if (!ytPlayer || !ytPlayer.getPlayerState) return;
+    const st = ytPlayer.getPlayerState(), t = ytPlayer.getCurrentTime?.() ?? 0, d = ytPlayer.getDuration?.() ?? 0;
+    $('#apiState').textContent = `API 상태=${st}  본편 위치=${t.toFixed(1)}s / ${d.toFixed(0)}s`;
+  }, 500);
+}
+
+function start(trial) {
+  stop();
+  cur = trial;
+  const [id, title] = trial.vid;
+  $('#now').textContent = `방식 ${trial.mode} — ${title}`;
+  $('#desc').textContent = MODES[trial.mode] + (trial.mode === 'D' ? '  → 아래 플레이어의 ▶를 직접 눌러주세요' : '');
+  const base = `https://www.youtube.com/embed/${id}?autoplay=1&loop=1&playlist=${id}`;
+  if (trial.mode === 'A') plainIframe(base, true);
+  if (trial.mode === 'B') plainIframe(base + `&enablejsapi=1&origin=${location.origin}`, true);
+  if (trial.mode === 'C') apiPlayer(id, true);
+  if (trial.mode === 'D') plainIframe(`https://www.youtube.com/embed/${id}`, false);
+  if (trial.mode === 'E') apiPlayer(id, false);
+  if (trial.mode === 'F') plainIframe(base + '&start=60', true);
+  if (trial.mode === 'G') apiPlayer(id, true, true);
+  if (trial.mode === 'H') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true);
+  $('#progress').textContent = `${idx + 1} / ${plan.length}`;
+}
+
+$('#next').onclick = () => {
+  if (idx + 1 >= plan.length) { plan = plan.concat(buildPlan()); }
+  start(plan[++idx]);
+};
+$('#stop').onclick = stop;
+
+document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
+  if (!cur) return;
+  const rec = { mode: cur.mode, vid: cur.vid[0], title: cur.vid[1], result: b.dataset.r, api: $('#apiState').textContent };
+  rec.origin = location.origin;
+  rec.ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+  results.push(rec);
+  save();
+  renderSummary();
+  stop();
+  cur = null;
+  $('#now').textContent = '기록됨 — 다음 실험 시작을 누르세요';
+  $('#desc').textContent = '';
+});
+
+function renderSummary() {
+  const rows = Object.keys(MODES).map(m => {
+    const r = results.filter(x => x.mode === m);
+    const c = k => r.filter(x => x.result === k).length;
+    return `<tr><td><b>${m}</b> <span class="muted">${MODES[m]}</span></td><td>${c('ad')}</td><td>${c('noad')}</td><td>${c('fail')}</td></tr>`;
+  });
+  $('#summary tbody').innerHTML = rows.join('');
+}
+renderSummary();
+$('#origin').textContent = '(' + location.origin + ', 저장된 기록 ' + results.length + '개)';
+$('#copy').onclick = async () => {
+  const text = results.map(r => JSON.stringify(r)).join('\n');
+  try { await navigator.clipboard.writeText(text); $('#copy').textContent = '복사됨 ✓'; }
+  catch (e) { prompt('아래 내용을 복사하세요', text); }
+};
+$('#reset').onclick = () => { results = []; save(); renderSummary(); $('#origin').textContent = '(' + location.origin + ', 저장된 기록 0개)'; };
+</script>
+</body>
+</html>
