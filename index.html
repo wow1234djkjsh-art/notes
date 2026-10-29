@@ -477,7 +477,25 @@ function setVolume(v) {
 // ---------- 자동 추천 (순수 함수) ----------
 // @@autoplay-pure-start
 // mine: 내 기록, mix: 지금 곡의 YouTube 믹스, taste: 내 취향 곡의 믹스, popular: 인기 음악
-const AUTO_WEIGHTS = { mine: 50, mix: 30, taste: 15, popular: 5 };
+const AUTO_WEIGHTS = { mine: 45, mix: 35, taste: 15, popular: 5 };
+// 싫어요: 아예 막지 않고 덜 나오게. 그 곡 자체, 같은 채널, 그 곡 YouTube 믹스에 있던 곡 (해당되면 곱해짐)
+const DISLIKE = { self: 0.1, artist: 0.5, similar: 0.8 };
+function dislikeIndex(disliked) {
+  const idx = { ids: new Set(), channels: new Set(), similar: new Set() };
+  for (const d of disliked) {
+    idx.ids.add(d.t.id);
+    if (d.t.channel) idx.channels.add(d.t.channel);
+    for (const id of d.similar || []) idx.similar.add(id);
+  }
+  return idx;
+}
+function penaltyOf(t, idx) {
+  return (idx.ids.has(t.id) ? DISLIKE.self : 1) * (idx.channels.has(t.channel) ? DISLIKE.artist : 1) * (idx.similar.has(t.id) ? DISLIKE.similar : 1);
+}
+// 곡 목록(Track 또는 {t,w})을 싫어요 반영한 {t,w}로
+function weigh(items, idx) {
+  return items.map(x => (x.t ? { t: x.t, w: x.w * penaltyOf(x.t, idx) } : { t: x, w: penaltyOf(x, idx) }));
+}
 function scoreOf(stat, liked) {
   return (stat ? stat.plays - 2 * stat.skips : 0) + (liked ? 3 : 0);
 }
