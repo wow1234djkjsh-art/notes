@@ -374,7 +374,8 @@ const durTime = () => (playerReady && player.getDuration ? player.getDuration() 
 
 // ---------- 대기열 ----------
 // source: 'search'(검색에서 한 곡) | 'list'(플레이리스트 등). auto: 대기열 뒤에 이어질 추천 곡(최대 5). removed: 이번 세션에 ✕로 뺀 추천 곡
-const Q = { list: [], i: -1, base: null, source: 'list', auto: [], removed: new Set(), gen: 0 };
+// autoEpoch: 자동 추천을 무효로 만들 때(끄기, 전체 반복) 올린다. waiting: 대기열 끝에서 추천을 기다리는 중. autoEmpty: 마지막 채우기에서 추천할 곡이 없었음
+const Q = { list: [], i: -1, base: null, source: 'list', auto: [], removed: new Set(), gen: 0, autoEpoch: 0, waiting: false, autoEmpty: false };
 const current = () => Q.list[Q.i] || null;
 
 function shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -387,7 +388,7 @@ function applyShuffle() {
 }
 function setQueue(list, i, source = 'list') {
   Q.list = list.map(slim); Q.i = i; Q.base = null;
-  Q.source = source; Q.auto = []; Q.gen++;
+  Q.source = source; Q.auto = []; Q.gen++; Q.waiting = false; Q.autoEmpty = false;
   if (store.shuffle) applyShuffle();
   playCurrent();
 }
@@ -408,10 +409,14 @@ function next(auto, fromError) {
   if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); }
   if (useAuto()) {
     if (takeAuto()) return playCurrent();
-    // 추천을 아직 못 받았으면 받아 보고, 그래도 없으면 예전처럼
+    // 추천을 아직 못 받았으면 받아 보고, 그래도 없으면 예전처럼. 기다리는 중에 또 누르면 무시
+    if (Q.waiting) return;
     const gen = Q.gen;
+    Q.waiting = true;
     refillAuto().then(() => {
-      if (gen !== Q.gen || Q.i + 1 < Q.list.length) return;
+      if (gen !== Q.gen) return;
+      Q.waiting = false;
+      if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); } // 기다리는 동안 "다음에 재생"으로 넣은 곡
       if (takeAuto()) playCurrent(); else if (!fromError) endOfList(auto);
     });
     return;
@@ -508,6 +513,11 @@ function pickNext(pools, weights, exclude, rng) {
 const autoplayOn = () => store.settings.autoplay !== false;
 // 검색에서 시작했으면 전체 반복이어도 추천을 계속한다
 const useAuto = () => autoplayOn() && (Q.source === 'search' || store.repeat !== 'all');
+// 자동 추천 켜기/끄기나 반복 모드가 바뀌면: 더는 안 쓸 추천은 버리고, 쓸 수 있게 되면 다시 채운다
+function autoSettingChanged() {
+  if (useAuto()) refillAuto(); else { Q.auto = []; Q.autoEpoch++; }
+  renderQueue();
+}
 function takeAuto() {
   const t = Q.auto.shift();
   if (!t) return false;
@@ -530,32 +540,33 @@ let popularP = null;
 const fetchPopular = () => popularP || (popularP = search('인기 음악')
   .then(r => r.filter(t => t.seconds >= 60 && t.seconds <= 600)).catch(() => [])
   .then(r => { if (!r.length) popularP = null; return r; }));
-let refilling = null, refillingGen = -1;
+let refilling = null, refillingToken = '';
+const autoToken = () => Q.gen + ':' + Q.autoEpoch;
 function refillAuto() {
-  // 이전 대기열의 채우기가 아직 도는 중이면, 끝난 뒤 새 대기열 기준으로 다시 채운다
-  if (refilling) return refillingGen === Q.gen ? refilling : refilling.then(() => refillAuto());
+  // 이전 대기열(또는 무효가 된 추천)의 채우기가 아직 도는 중이면, 끝난 뒤 지금 기준으로 다시 채운다
+  if (refilling) return refillingToken === autoToken() ? refilling : refilling.then(() => refillAuto());
   if (!useAuto() || Q.auto.length >= 5 || !current() || Q.list.length - Q.i - 1 > 2) return Promise.resolve();
-  const gen = refillingGen = Q.gen;
+  const token = refillingToken = autoToken();
   refilling = (async () => {
     const mine = minePool(store.stats, store.liked);
     const seed = Q.list[Q.list.length - 1];
     const exclude = new Set([...store.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
-    let mix = await fetchMix(seed.id);
+    const top = mine.slice().sort((a, b) => b.w - a.w).slice(0, 10);
+    const tasteSeed = top.length ? top[Math.floor(Math.random() * top.length)].t.id : null;
+    let [mix, taste, popular] = await Promise.all([fetchMix(seed.id), tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
     if (mix.filter(t => !exclude.has(t.id)).length < 5) {
       // 기준 곡 믹스가 거의 떨어졌으면 가장 최근에 제대로 들은 곡의 믹스로 보충
       const lastHeard = Object.values(store.stats).filter(x => x.plays > 0 && x.t.id !== seed.id).sort((a, b) => b.last - a.last)[0];
       if (lastHeard) mix = mix.concat(await fetchMix(lastHeard.t.id));
     }
-    const top = mine.slice().sort((a, b) => b.w - a.w).slice(0, 10);
-    const taste = top.length ? await fetchMix(top[Math.floor(Math.random() * top.length)].t.id) : [];
-    const popular = await fetchPopular();
-    if (gen !== Q.gen) return;
+    if (token !== autoToken() || !useAuto()) return;
     const pools = { mine, mix, taste, popular };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
       if (!p) break;
       Q.auto.push(slim(p.t)); exclude.add(p.t.id);
     }
+    Q.autoEmpty = !Q.auto.length;
     renderQueue();
   })().finally(() => { refilling = null; });
   return refilling;
@@ -751,8 +762,8 @@ function renderQueue() {
     <h4 style="margin-top:18px">다음 곡</h4>
     ${upcoming.length ? upcoming.map(({ t, k }) => `
       <div class="trk" data-act="jump" data-i="${k}"><img src="${thumb(t.id)}" alt="" loading="lazy"><div style="min-width:0"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div><button data-act="unqueue" data-i="${k}" title="빼기">✕</button></div>`).join('')
-      : `<p class="m-hint">${useAuto() && cur ? '곡이 끝나면 자동 추천이 이어져요' : store.repeat === 'all' && Q.list.length ? '처음부터 다시 재생돼요' : '비어 있어요'}</p>`}
-    ${Q.auto.length && autoplayOn() ? `<div data-auto-section>
+      : `<p class="m-hint">${useAuto() && cur && !Q.autoEmpty ? '곡이 끝나면 자동 추천이 이어져요' : store.repeat === 'all' && Q.list.length ? '처음부터 다시 재생돼요' : '비어 있어요'}</p>`}
+    ${Q.auto.length && useAuto() ? `<div data-auto-section>
       <h4 style="margin-top:18px">자동 추천</h4>
       ${Q.auto.map((t, k) => `
       <div class="trk" data-act="autoplaynow" data-i="${k}"><img src="${thumb(t.id)}" alt="" loading="lazy"><div style="min-width:0"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div><button data-act="autoremove" data-i="${k}" title="빼기">✕</button></div>`).join('')}
@@ -891,7 +902,7 @@ document.addEventListener('click', e => {
     case 'unqueue': Q.list.splice(i, 1); if (i < Q.i) Q.i--; renderQueue(); break;
     case 'toggle': togglePlay(); break;
     case 'prev': prev(); break;
-    case 'next': noteSkip(); next(false); break;
+    case 'next': if (!Q.waiting) noteSkip(); next(false); break;
     case 'back10': seekBy(-10); break;
     case 'fwd10': seekBy(10); break;
     case 'voldown': setVolume(store.volume - 10); toast(`볼륨 ${store.volume}`); break;
@@ -901,7 +912,10 @@ document.addEventListener('click', e => {
       if (store.shuffle) applyShuffle();
       else if (Q.base) { const cur = current(); Q.list = Q.base; Q.base = null; Q.i = Math.max(0, Q.list.findIndex(t => cur && t.id === cur.id)); }
       save(); renderAll(); break;
-    case 'repeat': store.repeat = { off: 'all', all: 'one', one: 'off' }[store.repeat]; save(); renderNow(); renderQueue(); break;
+    case 'repeat':
+      store.repeat = { off: 'all', all: 'one', one: 'off' }[store.repeat]; save();
+      autoSettingChanged(); renderNow();
+      break;
     case 'video': go(route.name === 'video' ? lastRoute : { name: 'video' }); renderNow(); break;
     case 'queue': store.showQueue = !store.showQueue; save(); renderAll(); break;
     case 'quickclose': toggleQuick(false); break;
@@ -931,7 +945,7 @@ document.addEventListener('change', e => {
   if (t.dataset.setting) { store.settings[t.dataset.setting] = t.value.trim(); save(); toast('저장했어요'); }
   if (t.dataset.settingBool) {
     store.settings[t.dataset.settingBool] = t.checked; save(); toast('저장했어요');
-    if (autoplayOn()) refillAuto(); else { Q.auto = []; renderQueue(); }
+    autoSettingChanged();
   }
   if (t.id === 'import' && t.files[0]) {
     t.files[0].text().then(txt => {
