@@ -345,7 +345,7 @@ window.onYouTubeIframeAPIReady = () => {
       onError: () => {
         errorStreak++;
         toast('재생할 수 없는 영상이라 건너뛰어요');
-        if (errorStreak < Q.list.length) setTimeout(() => next(false), 700);
+        if (errorStreak < Math.min(5, Q.list.length + Q.auto.length)) setTimeout(() => next(false), 700);
       },
     },
   });
@@ -372,7 +372,8 @@ const curTime = () => (playerReady && player.getCurrentTime ? player.getCurrentT
 const durTime = () => (playerReady && player.getDuration ? player.getDuration() : 0) || (Q.list[Q.i]?.seconds || 0);
 
 // ---------- 대기열 ----------
-const Q = { list: [], i: -1, base: null };
+// source: 'search'(검색에서 한 곡) | 'list'(플레이리스트 등). auto: 대기열 뒤에 이어질 추천 곡(최대 5). removed: 이번 세션에 ✕로 뺀 추천 곡
+const Q = { list: [], i: -1, base: null, source: 'list', auto: [], removed: new Set(), gen: 0 };
 const current = () => Q.list[Q.i] || null;
 
 function shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -383,8 +384,9 @@ function applyShuffle() {
   Q.list = cur ? [cur, ...shuffleArr(rest)] : shuffleArr(rest);
   Q.i = cur ? 0 : -1;
 }
-function setQueue(list, i) {
+function setQueue(list, i, source = 'list') {
   Q.list = list.map(slim); Q.i = i; Q.base = null;
+  Q.source = source; Q.auto = []; Q.gen++;
   if (store.shuffle) applyShuffle();
   playCurrent();
 }
@@ -396,14 +398,26 @@ function playCurrent() {
   store.recent = [slim(t), ...store.recent.filter(x => x.id !== t.id)].slice(0, 30);
   save();
   renderAll();
+  refillAuto();
 }
 function next(auto) {
   if (!Q.list.length) return;
   if (auto && store.repeat === 'one') { player.seekTo(0, true); player.playVideo(); return; }
-  if (Q.i + 1 < Q.list.length) Q.i++;
-  else if (store.repeat === 'all' || !auto) Q.i = 0;
-  else { renderAll(); return; }
-  playCurrent();
+  if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); }
+  if (useAuto()) {
+    if (takeAuto()) return playCurrent();
+    // 추천을 아직 못 받았으면 받아 보고, 그래도 없으면 예전처럼
+    const gen = Q.gen;
+    refillAuto().then(() => {
+      if (gen !== Q.gen || Q.i + 1 < Q.list.length) return;
+      if (takeAuto()) playCurrent(); else endOfList(auto);
+    });
+    return;
+  }
+  endOfList(auto);
+}
+function endOfList(auto) {
+  if (store.repeat === 'all' || !auto) { Q.i = 0; playCurrent(); } else renderAll();
 }
 // 재생 기록: 30초 이상 또는 절반 이상 들으면 곡당 한 번 plays, 처음 30초 안에 다음 버튼이면 skips
 let counted = false;
@@ -487,6 +501,57 @@ function pickNext(pools, weights, exclude, rng) {
   return { t: items[items.length - 1].t, from };
 }
 // @@autoplay-pure-end
+
+// ---------- 자동 추천 (대기열 연결) ----------
+const autoplayOn = () => store.settings.autoplay !== false;
+// 검색에서 시작했으면 전체 반복이어도 추천을 계속한다
+const useAuto = () => autoplayOn() && (Q.source === 'search' || store.repeat !== 'all');
+function takeAuto() {
+  const t = Q.auto.shift();
+  if (!t) return false;
+  Q.list.push(t); if (Q.base) Q.base.push(t);
+  Q.i = Q.list.length - 1;
+  return true;
+}
+const mixCache = new Map();
+function fetchMix(id) {
+  if (!mixCache.has(id)) {
+    mixCache.set(id, fetch(setting('searchUrl') + '?mix=' + encodeURIComponent(id))
+      .then(r => r.json()).then(j => j.results || []).catch(() => []));
+  }
+  return mixCache.get(id);
+}
+let popularP = null;
+const fetchPopular = () => popularP || (popularP = search('인기 음악').catch(() => []));
+let refilling = null;
+function refillAuto() {
+  if (refilling) return refilling;
+  if (!useAuto() || Q.auto.length >= 5 || !current() || Q.list.length - Q.i - 1 > 2) return Promise.resolve();
+  const gen = Q.gen;
+  refilling = (async () => {
+    const mine = minePool(store.stats, store.liked);
+    const seed = Q.list[Q.list.length - 1];
+    const exclude = new Set([...store.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
+    let mix = await fetchMix(seed.id);
+    if (mix.filter(t => !exclude.has(t.id)).length < 5) {
+      // 기준 곡 믹스가 거의 떨어졌으면 가장 최근에 제대로 들은 곡의 믹스로 보충
+      const lastHeard = Object.values(store.stats).filter(x => x.plays > 0 && x.t.id !== seed.id).sort((a, b) => b.last - a.last)[0];
+      if (lastHeard) mix = mix.concat(await fetchMix(lastHeard.t.id));
+    }
+    const top = mine.slice().sort((a, b) => b.w - a.w).slice(0, 10);
+    const taste = top.length ? await fetchMix(top[Math.floor(Math.random() * top.length)].t.id) : [];
+    const popular = await fetchPopular();
+    if (gen !== Q.gen) return;
+    const pools = { mine, mix, taste, popular };
+    while (Q.auto.length < 5) {
+      const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
+      if (!p) break;
+      Q.auto.push(slim(p.t)); exclude.add(p.t.id);
+    }
+    renderQueue();
+  })().finally(() => { refilling = null; });
+  return refilling;
+}
 
 // ---------- 검색 ----------
 function parseId(s) {
@@ -645,6 +710,7 @@ function renderMain() {
     el.innerHTML = `
       <h2>설정</h2>
       <div class="set">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" data-setting-bool="autoplay" ${autoplayOn() ? 'checked' : ''}> 자동 추천 (곡이 끝나면 어울리는 곡을 이어서 재생)</label>
         <label>검색 서버 주소 (Google Apps Script 웹앱 /exec)</label>
         <input type="text" data-setting="searchUrl" value="${esc(store.settings.searchUrl || '')}" placeholder="${esc(CONFIG.searchUrl || 'https://script.google.com/macros/s/.../exec')}">
         <label>예비 검색 (Invidious 서버)</label>
@@ -782,7 +848,10 @@ document.addEventListener('click', e => {
   const a = el.dataset.act, key = el.dataset.list, i = +el.dataset.i;
   switch (a) {
     case 'go': go({ name: el.dataset.route, id: el.dataset.id }); break;
-    case 'play': setQueue(lists[key], i); break;
+    case 'play':
+      if ((key === 'search' || key === 'quick') && autoplayOn()) setQueue([lists[key][i]], 0, 'search');
+      else setQueue(lists[key], i);
+      break;
     case 'playall': if (lists[key].length) { store.shuffle = false; save(); setQueue(lists[key], 0); } break;
     case 'shuffleall': if (lists[key].length) { store.shuffle = true; save(); setQueue(lists[key], Math.floor(Math.random() * lists[key].length)); } break;
     case 'like': toggleLike(lists[key][i]); break;
@@ -840,6 +909,10 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.matches('.pl-name')) { const p = plById(t.dataset.pl); p.name = t.value.trim() || p.name; save(); renderLib(); }
   if (t.dataset.setting) { store.settings[t.dataset.setting] = t.value.trim(); save(); toast('저장했어요'); }
+  if (t.dataset.settingBool) {
+    store.settings[t.dataset.settingBool] = t.checked; save(); toast('저장했어요');
+    if (autoplayOn()) refillAuto(); else { Q.auto = []; renderQueue(); }
+  }
   if (t.id === 'import' && t.files[0]) {
     t.files[0].text().then(txt => {
       const d = JSON.parse(txt);
