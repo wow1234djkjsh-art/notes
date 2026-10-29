@@ -63,6 +63,11 @@
     D: 640×360 보임 · 자동재생 없음 · 플레이어 직접 클릭 (대조군)<br>
     E: IFrame Player API · 640×360 보임 · 자동재생 (영상 칸 시나리오)<br>
     F: A + <code>start=60</code> (API 없이 위치 이동하는 대안)<br>
+    <b>이번 라운드는 D·A·L·M·N만 해요.</b><br>
+    L: 러버블 사이트와 똑같은 iframe — <code>allow="autoplay"</code>만 (<code>encrypted-media</code> 없음)<br>
+    M: L + <code>youtube-nocookie.com</code><br>
+    N: L을 640×360으로 보이게 (광고가 화면에 뜨는지 눈으로 확인)<br>
+    <span style="opacity:.6">이전 라운드:</span><br>
     G: 실제 사이트와 똑같이 — <code>youtube-nocookie</code> IFrame API · 1px 숨김 · 빈 플레이어 만든 뒤 <code>loadVideoById</code><br>
     H: <code>youtube-nocookie.com/embed</code> 주소만 iframe · 1px 숨김 · 자동재생
   </div>
@@ -86,12 +91,17 @@ const MODES = {
   F: 'A + start=60',
   G: '실제 사이트 방식 (nocookie API · loadVideoById)',
   H: 'nocookie 주소만 iframe · 1px 숨김 · 자동재생',
+  L: '러버블 사이트 그대로 (allow=autoplay만)',
+  M: 'L + youtube-nocookie 주소',
+  N: '640×360 보임 · allow=autoplay만 · 자동재생 (눈으로 확인용)',
 };
+// 이번 라운드: encrypted-media를 빼면 광고가 안 나오는지 (A=뺀 것 없음 vs L/M/N=뺌)
+const ROUND = 'ALMN';
 
 // D 먼저 2번으로 "이 환경에서 광고가 나오긴 하는지" 확인한 뒤, 나머지는 섞어서 진행
 function buildPlan() {
   const rest = [];
-  for (const m of 'ABCEFGH') for (let i = 0; i < 2; i++) rest.push(m);
+  for (const m of ROUND) for (let i = 0; i < 3; i++) rest.push(m);
   for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
   return ['D', 'D', ...rest, 'D'].map((m, i) => ({ mode: m, vid: VIDEOS[i % VIDEOS.length] }));
 }
@@ -99,7 +109,7 @@ function buildPlan() {
 let plan = buildPlan(), idx = -1, cur = null, ytPlayer = null, poll = null;
 const $ = s => document.querySelector(s);
 // GitHub Pages에는 기록 서버가 없으니 브라우저에 저장하고 [결과 복사]로 꺼낸다
-const KEY = 'lab-results';
+const KEY = 'lab-results-2';
 let results = [];
 try { results = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(results)); } catch (e) {} };
@@ -119,10 +129,10 @@ function stop() {
   $('#apiState').textContent = '';
 }
 
-function plainIframe(src, hidden) {
+function plainIframe(src, hidden, allow = 'autoplay; encrypted-media') {
   const f = document.createElement('iframe');
   f.src = src;
-  f.allow = 'autoplay; encrypted-media';
+  f.allow = allow;
   if (hidden) { f.className = 'hidden-player'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true'); document.body.appendChild(f); }
   else { f.allowFullscreen = true; $('#visible').appendChild(f); }
 }
@@ -168,6 +178,9 @@ function start(trial) {
   if (trial.mode === 'F') plainIframe(base + '&start=60', true);
   if (trial.mode === 'G') apiPlayer(id, true, true);
   if (trial.mode === 'H') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true);
+  if (trial.mode === 'L') plainIframe(base, true, 'autoplay');
+  if (trial.mode === 'M') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true, 'autoplay');
+  if (trial.mode === 'N') plainIframe(base, false, 'autoplay');
   $('#progress').textContent = `${idx + 1} / ${plan.length}`;
 }
 
@@ -192,7 +205,7 @@ document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
 });
 
 function renderSummary() {
-  const rows = Object.keys(MODES).map(m => {
+  const rows = [...'D' + ROUND].map(m => {
     const r = results.filter(x => x.mode === m);
     const c = k => r.filter(x => x.result === k).length;
     return `<tr><td><b>${m}</b> <span class="muted">${MODES[m]}</span></td><td>${c('ad')}</td><td>${c('noad')}</td><td>${c('fail')}</td></tr>`;
