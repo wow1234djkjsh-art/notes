@@ -283,7 +283,7 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s /
 
 // ---------- 저장소 ----------
 const KEY = 'sm.v1';
-const defaults = () => ({ liked: [], playlists: [], recent: [], volume: 70, repeat: 'off', shuffle: false, showQueue: true, doc: null, settings: {} });
+const defaults = () => ({ liked: [], playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, showQueue: true, doc: null, settings: {} });
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
 let saveTimer;
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }, 200); }
@@ -391,6 +391,7 @@ function setQueue(list, i) {
 function playCurrent() {
   const t = current();
   if (!t) return;
+  counted = false;
   if (playerReady) player.loadVideoById(t.id); else pendingId = t.id;
   store.recent = [slim(t), ...store.recent.filter(x => x.id !== t.id)].slice(0, 30);
   save();
@@ -403,6 +404,27 @@ function next(auto) {
   else if (store.repeat === 'all' || !auto) Q.i = 0;
   else { renderAll(); return; }
   playCurrent();
+}
+// 재생 기록: 30초 이상 또는 절반 이상 들으면 곡당 한 번 plays, 처음 30초 안에 다음 버튼이면 skips
+let counted = false;
+const STATS_MAX = 500;
+function statFor(t) {
+  const s = store.stats[t.id] || (store.stats[t.id] = { t: slim(t), plays: 0, skips: 0, last: 0 });
+  s.last = Date.now();
+  const ids = Object.keys(store.stats);
+  if (ids.length > STATS_MAX) ids.sort((a, b) => store.stats[a].last - store.stats[b].last).slice(0, ids.length - STATS_MAX).forEach(id => delete store.stats[id]);
+  return s;
+}
+function noteListen() {
+  const t = current(), c = curTime(), d = durTime();
+  if (counted || !t || !(c >= 30 || (d && c >= d / 2))) return;
+  counted = true;
+  statFor(t).plays++;
+  save();
+}
+function noteSkip() {
+  const t = current();
+  if (t && curTime() < 30) { statFor(t).skips++; save(); }
 }
 function prev() {
   if (!Q.list.length) return;
@@ -691,7 +713,9 @@ function renderAll() {
 // 진행바 갱신
 let dragging = false;
 setInterval(() => {
-  if (dragging || !current()) return;
+  if (!current()) return;
+  noteListen();
+  if (dragging) return;
   const c = curTime(), d = durTime();
   const v = d ? Math.round((c / d) * 1000) : 0;
   if (mode === 'music') { $('#seek').value = v; $('#t-cur').textContent = fmt(c); $('#t-dur').textContent = fmt(d); }
@@ -778,7 +802,7 @@ document.addEventListener('click', e => {
     case 'unqueue': Q.list.splice(i, 1); if (i < Q.i) Q.i--; renderQueue(); break;
     case 'toggle': togglePlay(); break;
     case 'prev': prev(); break;
-    case 'next': next(false); break;
+    case 'next': noteSkip(); next(false); break;
     case 'back10': seekBy(-10); break;
     case 'fwd10': seekBy(10); break;
     case 'voldown': setVolume(store.volume - 10); toast(`볼륨 ${store.volume}`); break;
