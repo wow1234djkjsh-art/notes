@@ -345,7 +345,8 @@ window.onYouTubeIframeAPIReady = () => {
       onError: () => {
         errorStreak++;
         toast('재생할 수 없는 영상이라 건너뛰어요');
-        if (errorStreak < Math.min(5, Q.list.length + Q.auto.length)) setTimeout(() => next(false), 700);
+        // 자동 추천 중이면 대기열이 짧아도 추천 곡으로 넘어간다 (최대 5번 연속)
+        if (errorStreak < 5 && (useAuto() || errorStreak < Q.list.length)) setTimeout(() => next(false, true), 700);
       },
     },
   });
@@ -400,7 +401,8 @@ function playCurrent() {
   renderAll();
   refillAuto();
 }
-function next(auto) {
+// fromError: 재생 오류로 넘어가는 중이면 추천이 없을 때 처음(=고장 난 곡)으로 돌아가지 않고 멈춘다
+function next(auto, fromError) {
   if (!Q.list.length) return;
   if (auto && store.repeat === 'one') { player.seekTo(0, true); player.playVideo(); return; }
   if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); }
@@ -410,7 +412,7 @@ function next(auto) {
     const gen = Q.gen;
     refillAuto().then(() => {
       if (gen !== Q.gen || Q.i + 1 < Q.list.length) return;
-      if (takeAuto()) playCurrent(); else endOfList(auto);
+      if (takeAuto()) playCurrent(); else if (!fromError) endOfList(auto);
     });
     return;
   }
@@ -516,18 +518,24 @@ function takeAuto() {
 const mixCache = new Map();
 function fetchMix(id) {
   if (!mixCache.has(id)) {
+    // 실패하거나 비면 캐시에서 지워서 다음에 다시 시도한다
     mixCache.set(id, fetch(setting('searchUrl') + '?mix=' + encodeURIComponent(id))
-      .then(r => r.json()).then(j => j.results || []).catch(() => []));
+      .then(r => r.json()).then(j => j.results || []).catch(() => [])
+      .then(r => { if (!r.length) mixCache.delete(id); return r; }));
   }
   return mixCache.get(id);
 }
 let popularP = null;
-const fetchPopular = () => popularP || (popularP = search('인기 음악').catch(() => []));
-let refilling = null;
+// 인기 음악 검색엔 1시간짜리 모음 같은 게 섞이니 1~10분만 남긴다
+const fetchPopular = () => popularP || (popularP = search('인기 음악')
+  .then(r => r.filter(t => t.seconds >= 60 && t.seconds <= 600)).catch(() => [])
+  .then(r => { if (!r.length) popularP = null; return r; }));
+let refilling = null, refillingGen = -1;
 function refillAuto() {
-  if (refilling) return refilling;
+  // 이전 대기열의 채우기가 아직 도는 중이면, 끝난 뒤 새 대기열 기준으로 다시 채운다
+  if (refilling) return refillingGen === Q.gen ? refilling : refilling.then(() => refillAuto());
   if (!useAuto() || Q.auto.length >= 5 || !current() || Q.list.length - Q.i - 1 > 2) return Promise.resolve();
-  const gen = Q.gen;
+  const gen = refillingGen = Q.gen;
   refilling = (async () => {
     const mine = minePool(store.stats, store.liked);
     const seed = Q.list[Q.list.length - 1];
