@@ -743,7 +743,12 @@ function renderQueue() {
     <h4 style="margin-top:18px">다음 곡</h4>
     ${upcoming.length ? upcoming.map(({ t, k }) => `
       <div class="trk" data-act="jump" data-i="${k}"><img src="${thumb(t.id)}" alt="" loading="lazy"><div style="min-width:0"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div><button data-act="unqueue" data-i="${k}" title="빼기">✕</button></div>`).join('')
-      : `<p class="m-hint">${store.repeat === 'all' && Q.list.length ? '처음부터 다시 재생돼요' : '비어 있어요'}</p>`}`;
+      : `<p class="m-hint">${useAuto() && cur ? '곡이 끝나면 자동 추천이 이어져요' : store.repeat === 'all' && Q.list.length ? '처음부터 다시 재생돼요' : '비어 있어요'}</p>`}
+    ${Q.auto.length && autoplayOn() ? `<div data-auto-section>
+      <h4 style="margin-top:18px">자동 추천</h4>
+      ${Q.auto.map((t, k) => `
+      <div class="trk" data-act="autoplaynow" data-i="${k}"><img src="${thumb(t.id)}" alt="" loading="lazy"><div style="min-width:0"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div><button data-act="autoremove" data-i="${k}" title="빼기">✕</button></div>`).join('')}
+    </div>` : ''}`;
 }
 
 function renderNow() {
@@ -868,6 +873,13 @@ document.addEventListener('click', e => {
       if (delArmed !== el.dataset.id) { delArmed = el.dataset.id; el.textContent = '한 번 더 누르면 삭제'; break; }
       store.playlists = store.playlists.filter(p => p.id !== el.dataset.id); save(); delArmed = null; go({ name: 'home' }); break;
     case 'jump': Q.i = i; playCurrent(); break;
+    case 'autoplaynow': {
+      const [t] = Q.auto.splice(i, 1);
+      Q.list.splice(Q.i + 1, 0, t); if (Q.base) Q.base.push(t);
+      Q.i++; playCurrent();
+      break;
+    }
+    case 'autoremove': Q.removed.add(Q.auto[i].id); Q.auto.splice(i, 1); renderQueue(); refillAuto(); break;
     case 'unqueue': Q.list.splice(i, 1); if (i < Q.i) Q.i--; renderQueue(); break;
     case 'toggle': togglePlay(); break;
     case 'prev': prev(); break;
