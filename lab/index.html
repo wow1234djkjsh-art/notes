@@ -24,7 +24,6 @@
   table { border-collapse:collapse; width:100%; }
   th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; }
   code { background:#eef0f3; padding:1px 5px; border-radius:4px; }
-  #apiState { font-family:ui-monospace,monospace; font-size:12px; }
 </style>
 </head>
 <body>
@@ -45,7 +44,6 @@
       <button class="noad" data-r="noad">광고 안 나옴 (바로 노래)</button>
       <button data-r="fail">재생 안 됨 / 오류</button>
     </div>
-    <div id="apiState" class="muted" style="margin-top:8px"></div>
     <div id="visible"></div>
   </div>
 
@@ -56,20 +54,10 @@
   </div>
 
   <div class="card muted">
-    <b>방식 설명</b><br>
-    A: 주소만 넣은 iframe · 1px 숨김 · 자동재생 (원래 사이트와 동일)<br>
-    B: A + <code>enablejsapi=1</code><br>
-    C: IFrame Player API · 1px 숨김 · 자동재생 (앞/뒤 이동 가능한 방식)<br>
-    D: 640×360 보임 · 자동재생 없음 · 플레이어 직접 클릭 (대조군)<br>
-    E: IFrame Player API · 640×360 보임 · 자동재생 (영상 칸 시나리오)<br>
-    F: A + <code>start=60</code> (API 없이 위치 이동하는 대안)<br>
-    <b>이번 라운드는 D·A·L·M·N만 해요.</b><br>
-    L: 러버블 사이트와 똑같은 iframe — <code>allow="autoplay"</code>만 (<code>encrypted-media</code> 없음)<br>
-    M: L + <code>youtube-nocookie.com</code><br>
-    N: L을 640×360으로 보이게 (광고가 화면에 뜨는지 눈으로 확인)<br>
-    <span style="opacity:.6">이전 라운드:</span><br>
-    G: 실제 사이트와 똑같이 — <code>youtube-nocookie</code> IFrame API · 1px 숨김 · 빈 플레이어 만든 뒤 <code>loadVideoById</code><br>
-    H: <code>youtube-nocookie.com/embed</code> 주소만 iframe · 1px 숨김 · 자동재생
+    <b>방식 설명</b> (전부 <code>encrypted-media</code> 없이 <code>allow="autoplay"</code>만)<br>
+    L: 러버블 사이트와 똑같은 iframe · 1px 숨김 · 자동재생<br>
+    M: L + <code>youtube-nocookie.com</code> 주소<br>
+    N: L을 640×360으로 보이게 (광고가 화면에 뜨는지 눈으로 확인)
   </div>
 </main>
 
@@ -83,84 +71,39 @@ const VIDEOS = [
   ['BzYnNdJhZQw', '아이유 - 밤편지 (1theK)'],
 ];
 const MODES = {
-  A: '주소만 iframe · 1px 숨김 · 자동재생',
-  B: 'A + enablejsapi=1',
-  C: 'IFrame API · 1px 숨김 · 자동재생',
-  D: '640×360 보임 · 직접 클릭 재생 (대조군)',
-  E: 'IFrame API · 640×360 보임 · 자동재생',
-  F: 'A + start=60',
-  G: '실제 사이트 방식 (nocookie API · loadVideoById)',
-  H: 'nocookie 주소만 iframe · 1px 숨김 · 자동재생',
-  L: '러버블 사이트 그대로 (allow=autoplay만)',
+  L: '러버블 방식 · allow=autoplay만 · 1px 숨김',
   M: 'L + youtube-nocookie 주소',
-  N: '640×360 보임 · allow=autoplay만 · 자동재생 (눈으로 확인용)',
+  N: 'allow=autoplay만 · 640×360 보임 · 자동재생',
 };
-// 이번 라운드: encrypted-media를 빼면 광고가 안 나오는지 (A=뺀 것 없음 vs L/M/N=뺌)
-const ROUND = 'ALMN';
 
-// D 먼저 2번으로 "이 환경에서 광고가 나오긴 하는지" 확인한 뒤, 나머지는 섞어서 진행
+// 방식마다 3번씩 섞어서 진행
 function buildPlan() {
   const rest = [];
-  for (const m of ROUND) for (let i = 0; i < 3; i++) rest.push(m);
+  for (const m in MODES) for (let i = 0; i < 3; i++) rest.push(m);
   for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
-  return ['D', 'D', ...rest, 'D'].map((m, i) => ({ mode: m, vid: VIDEOS[i % VIDEOS.length] }));
+  return rest.map((m, i) => ({ mode: m, vid: VIDEOS[i % VIDEOS.length] }));
 }
 
-let plan = buildPlan(), idx = -1, cur = null, ytPlayer = null, poll = null;
+let plan = buildPlan(), idx = -1, cur = null;
 const $ = s => document.querySelector(s);
 // GitHub Pages에는 기록 서버가 없으니 브라우저에 저장하고 [결과 복사]로 꺼낸다
-const KEY = 'lab-results-2';
+const KEY = 'lab-results-3';
 let results = [];
 try { results = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(results)); } catch (e) {} };
 
-let ytReady;
-const ytApi = new Promise(r => (ytReady = r));
-window.onYouTubeIframeAPIReady = () => ytReady();
-const s = document.createElement('script');
-s.src = 'https://www.youtube.com/iframe_api';
-document.head.appendChild(s);
-
 function stop() {
-  clearInterval(poll);
-  if (ytPlayer) { try { ytPlayer.destroy(); } catch (e) {} ytPlayer = null; }
   document.querySelectorAll('.hidden-player').forEach(e => e.remove());
   $('#visible').innerHTML = '';
-  $('#apiState').textContent = '';
 }
 
-function plainIframe(src, hidden, allow = 'autoplay; encrypted-media') {
+// 러버블 사이트처럼 autoplay만 허용 (encrypted-media 없음)
+function plainIframe(src, hidden) {
   const f = document.createElement('iframe');
   f.src = src;
-  f.allow = allow;
+  f.allow = 'autoplay';
   if (hidden) { f.className = 'hidden-player'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true'); document.body.appendChild(f); }
   else { f.allowFullscreen = true; $('#visible').appendChild(f); }
-}
-
-async function apiPlayer(id, hidden, site) {
-  await ytApi;
-  const host = document.createElement('div');
-  if (hidden) { host.className = 'hidden-player'; document.body.appendChild(host); }
-  else $('#visible').appendChild(host);
-  // site: 실제 사이트처럼 nocookie 호스트로 빈 플레이어를 만들고 준비되면 곡을 넣는다
-  ytPlayer = new YT.Player(host, site ? {
-    host: 'https://www.youtube-nocookie.com',
-    width: 1, height: 1,
-    playerVars: { playsinline: 1, rel: 0, autoplay: 1 },
-    events: { onReady: e => e.target.loadVideoById(id) },
-  } : {
-    videoId: id,
-    width: hidden ? 1 : 640, height: hidden ? 1 : 360,
-    playerVars: { autoplay: 1, playsinline: 1 },
-    events: { onReady: e => e.target.playVideo() },
-  });
-  if (hidden) ytPlayer.getIframe().className = 'hidden-player';
-  // 광고 중에는 본편 currentTime이 0에 머무는 경우가 있어 참고용으로 표시
-  poll = setInterval(() => {
-    if (!ytPlayer || !ytPlayer.getPlayerState) return;
-    const st = ytPlayer.getPlayerState(), t = ytPlayer.getCurrentTime?.() ?? 0, d = ytPlayer.getDuration?.() ?? 0;
-    $('#apiState').textContent = `API 상태=${st}  본편 위치=${t.toFixed(1)}s / ${d.toFixed(0)}s`;
-  }, 500);
 }
 
 function start(trial) {
@@ -168,19 +111,11 @@ function start(trial) {
   cur = trial;
   const [id, title] = trial.vid;
   $('#now').textContent = `방식 ${trial.mode} — ${title}`;
-  $('#desc').textContent = MODES[trial.mode] + (trial.mode === 'D' ? '  → 아래 플레이어의 ▶를 직접 눌러주세요' : '');
+  $('#desc').textContent = MODES[trial.mode];
   const base = `https://www.youtube.com/embed/${id}?autoplay=1&loop=1&playlist=${id}`;
-  if (trial.mode === 'A') plainIframe(base, true);
-  if (trial.mode === 'B') plainIframe(base + `&enablejsapi=1&origin=${location.origin}`, true);
-  if (trial.mode === 'C') apiPlayer(id, true);
-  if (trial.mode === 'D') plainIframe(`https://www.youtube.com/embed/${id}`, false);
-  if (trial.mode === 'E') apiPlayer(id, false);
-  if (trial.mode === 'F') plainIframe(base + '&start=60', true);
-  if (trial.mode === 'G') apiPlayer(id, true, true);
-  if (trial.mode === 'H') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true);
-  if (trial.mode === 'L') plainIframe(base, true, 'autoplay');
-  if (trial.mode === 'M') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true, 'autoplay');
-  if (trial.mode === 'N') plainIframe(base, false, 'autoplay');
+  if (trial.mode === 'L') plainIframe(base, true);
+  if (trial.mode === 'M') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true);
+  if (trial.mode === 'N') plainIframe(base, false);
   $('#progress').textContent = `${idx + 1} / ${plan.length}`;
 }
 
@@ -192,7 +127,7 @@ $('#stop').onclick = stop;
 
 document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
   if (!cur) return;
-  const rec = { mode: cur.mode, vid: cur.vid[0], title: cur.vid[1], result: b.dataset.r, api: $('#apiState').textContent };
+  const rec = { mode: cur.mode, vid: cur.vid[0], title: cur.vid[1], result: b.dataset.r };
   rec.origin = location.origin;
   rec.ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
   results.push(rec);
@@ -205,7 +140,7 @@ document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
 });
 
 function renderSummary() {
-  const rows = [...'D' + ROUND].map(m => {
+  const rows = Object.keys(MODES).map(m => {
     const r = results.filter(x => x.mode === m);
     const c = k => r.filter(x => x.result === k).length;
     return `<tr><td><b>${m}</b> <span class="muted">${MODES[m]}</span></td><td>${c('ad')}</td><td>${c('noad')}</td><td>${c('fail')}</td></tr>`;
