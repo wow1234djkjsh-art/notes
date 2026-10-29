@@ -54,10 +54,10 @@
   </div>
 
   <div class="card muted">
-    <b>방식 설명</b> (전부 <code>encrypted-media</code> 없이 <code>allow="autoplay"</code>만)<br>
-    L: 러버블 사이트와 똑같은 iframe · 1px 숨김 · 자동재생<br>
-    M: L + <code>youtube-nocookie.com</code> 주소<br>
-    N: L을 640×360으로 보이게 (광고가 화면에 뜨는지 눈으로 확인)
+    <b>방식 설명</b> (전부 1px 숨김 · 자동재생 · 반복 · <code>allow="autoplay"</code>만 · <code>start=60</code>)<br>
+    P: <code>youtube.com</code> 주소<br>
+    Q: <code>youtube-nocookie.com</code> 주소<br>
+    R: Q + <code>controls=0 rel=0 iv_load_policy=3 playsinline=1 disablekb=1 fs=0</code> (붙일 수 있는 옵션 전부)
   </div>
 </main>
 
@@ -71,9 +71,9 @@ const VIDEOS = [
   ['BzYnNdJhZQw', '아이유 - 밤편지 (1theK)'],
 ];
 const MODES = {
-  L: '러버블 방식 · allow=autoplay만 · 1px 숨김',
-  M: 'L + youtube-nocookie 주소',
-  N: 'allow=autoplay만 · 640×360 보임 · 자동재생',
+  P: '전부 합침 · youtube.com',
+  Q: '전부 합침 · youtube-nocookie.com',
+  R: '전부 합침 · nocookie + 플레이어 옵션 전부',
 };
 
 // 방식마다 3번씩 섞어서 진행
@@ -87,7 +87,7 @@ function buildPlan() {
 let plan = buildPlan(), idx = -1, cur = null;
 const $ = s => document.querySelector(s);
 // GitHub Pages에는 기록 서버가 없으니 브라우저에 저장하고 [결과 복사]로 꺼낸다
-const KEY = 'lab-results-3';
+const KEY = 'lab-results-4';
 let results = [];
 try { results = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(results)); } catch (e) {} };
@@ -112,10 +112,11 @@ function start(trial) {
   const [id, title] = trial.vid;
   $('#now').textContent = `방식 ${trial.mode} — ${title}`;
   $('#desc').textContent = MODES[trial.mode];
-  const base = `https://www.youtube.com/embed/${id}?autoplay=1&loop=1&playlist=${id}`;
-  if (trial.mode === 'L') plainIframe(base, true);
-  if (trial.mode === 'M') plainIframe(base.replace('www.youtube.com', 'www.youtube-nocookie.com'), true);
-  if (trial.mode === 'N') plainIframe(base, false);
+  const q = `?autoplay=1&loop=1&playlist=${id}&start=60`;
+  const extra = '&controls=0&rel=0&iv_load_policy=3&playsinline=1&disablekb=1&fs=0';
+  if (trial.mode === 'P') plainIframe(`https://www.youtube.com/embed/${id}${q}`, true);
+  if (trial.mode === 'Q') plainIframe(`https://www.youtube-nocookie.com/embed/${id}${q}`, true);
+  if (trial.mode === 'R') plainIframe(`https://www.youtube-nocookie.com/embed/${id}${q}${extra}`, true);
   $('#progress').textContent = `${idx + 1} / ${plan.length}`;
 }
 
