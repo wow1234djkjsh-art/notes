@@ -431,6 +431,41 @@ function setVolume(v) {
   $('#vol').value = store.volume; save();
 }
 
+// ---------- 자동 추천 (순수 함수) ----------
+// @@autoplay-pure-start
+// mine: 내 기록, mix: 지금 곡의 YouTube 믹스, taste: 내 취향 곡의 믹스, popular: 인기 음악
+const AUTO_WEIGHTS = { mine: 50, mix: 30, taste: 15, popular: 5 };
+function scoreOf(stat, liked) {
+  return (stat ? stat.plays - 2 * stat.skips : 0) + (liked ? 3 : 0);
+}
+function minePool(stats, likedTracks) {
+  const liked = new Set(likedTracks.map(t => t.id));
+  const pool = [];
+  for (const id in stats) {
+    const w = scoreOf(stats[id], liked.has(id));
+    if (w > 0) pool.push({ t: stats[id].t, w });
+  }
+  for (const t of likedTracks) if (!stats[t.id]) pool.push({ t, w: scoreOf(undefined, true) });
+  return pool;
+}
+// 비중대로 묶음을 고르고 그 안에서 한 곡. 제외 후 후보가 남은 묶음만 고려하므로 모두 비면 null.
+function pickNext(pools, weights, exclude, rng) {
+  const avail = {};
+  let total = 0;
+  for (const k in weights) {
+    const items = (pools[k] || []).map(x => (x.t ? x : { t: x, w: 1 })).filter(x => !exclude.has(x.t.id));
+    if (items.length) { avail[k] = items; total += weights[k]; }
+  }
+  if (!total) return null;
+  let r = rng() * total, from;
+  for (from in avail) { r -= weights[from]; if (r < 0) break; }
+  const items = avail[from];
+  let w = rng() * items.reduce((s, x) => s + x.w, 0);
+  for (const x of items) { w -= x.w; if (w < 0) return { t: x.t, from }; }
+  return { t: items[items.length - 1].t, from };
+}
+// @@autoplay-pure-end
+
 // ---------- 검색 ----------
 function parseId(s) {
   const m = s.match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/);
