@@ -2,6 +2,10 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>
+  // 옛 GitHub Pages 주소로 오면 러버블로 보낸다 (github.io에선 광고가 나와서). #stay를 붙이면 남아서 옛 기록을 내보낼 수 있다.
+  if (location.hostname.endsWith('github.io') && location.hash !== '#stay') location.replace('https://blank-canvas-github-launchpad.lovable.app/');
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>제목 없는 문서 - Google Docs</title>
@@ -569,6 +573,7 @@ function refillAuto() {
   if (!useAuto() || Q.auto.length >= 5 || !current() || Q.list.length - Q.i - 1 > 2) return Promise.resolve();
   const token = refillingToken = autoToken();
   refilling = (async () => {
+    store.disliked.filter(d => !(d.similar && d.similar.length) && (d.tries || 0) < 3).slice(0, 3).forEach(fillSimilar);
     const mine = minePool(store.stats, store.liked);
     const seed = Q.list[Q.list.length - 1];
     const exclude = new Set([...store.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
@@ -895,7 +900,15 @@ function toggleDislike(t) {
   store.liked = store.liked.filter(x => x.id !== t.id);
   Q.auto = Q.auto.filter(x => x.id !== t.id);
   save(); renderAll(); toast('이 곡과 비슷한 곡이 덜 나와요');
-  fetchMix(t.id).then(r => { d.similar = r.map(x => x.id).filter(id => id !== t.id); save(); });
+  fillSimilar(d);
+}
+// 서버가 실패해서 비슷한 곡이 비었으면 자동 추천을 채울 때 다시 시도한다 (한 곡당 3번까지)
+function fillSimilar(d) {
+  d.tries = (d.tries || 0) + 1;
+  return fetchMix(d.t.id).then(r => {
+    if (r.length) { d.similar = r.map(x => x.id).filter(id => id !== d.t.id); delete d.tries; }
+    save();
+  });
 }
 function newPlaylist(withTrack) {
   const p = { id: Date.now().toString(36), name: `내 플레이리스트 #${store.playlists.length + 1}`, tracks: withTrack ? [slim(withTrack)] : [] };
