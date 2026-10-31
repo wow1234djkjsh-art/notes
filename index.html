@@ -3,8 +3,15 @@
 <head>
 <meta charset="utf-8">
 <script>
-  // 옛 GitHub Pages 주소로 오면 러버블로 보낸다 (github.io에선 광고가 나와서). #stay를 붙이면 남아서 옛 기록을 내보낼 수 있다.
-  if (location.hostname.endsWith('github.io') && location.hash !== '#stay') location.replace('https://blank-canvas-github-launchpad.lovable.app/');
+  // 옛 GitHub Pages 주소(광고가 나옴)로 오면 러버블로 보낸다. 여기에 저장된 기록이 있으면 (또는 #stay면) 남아서 내보내기 안내를 띄운다.
+  const NEW_SITE = 'https://blank-canvas-github-launchpad.lovable.app/';
+  const OLD_SITE = location.hostname.endsWith('github.io') && (() => {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem('sm.v1')); } catch (e) {}
+    const has = !!s && ((s.liked || []).length || (s.playlists || []).length || Object.keys(s.stats || {}).length || (s.disliked || []).length);
+    if (!has && location.hash !== '#stay') { location.replace(NEW_SITE); return false; }
+    return true;
+  })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
@@ -182,6 +189,10 @@
   #quick .q-ctl { display: flex; justify-content: space-between; gap: 4px; }
   #quick .q-ctl button { flex: 1; background: #f1f3f4; border-radius: 6px; padding: 5px 0; font-size: 12px; color: #3c4043; }
   #quick .q-ctl button:hover { background: #e8eaed; }
+  #quick .q-ctl button.on { background: #d2e3fc; }
+  #moved { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #fef7e0; color: #3c4043; border-bottom: 1px solid #f9e2a6; padding: 8px 16px; font-size: 13px; text-align: center; }
+  #moved button, #moved a { color: #1a73e8; font-size: 13px; text-decoration: underline; }
+  #moved .x { text-decoration: none; color: #5f6368; margin-left: 8px; }
 
   /* ---------- 플레이어 / 기타 ---------- */
   #yt-wrap { position: fixed; z-index: 30; }
@@ -285,7 +296,7 @@ const CONFIG = {
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const thumb = id => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+const thumb = id => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`;
 const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 
 // ---------- 저장소 ----------
@@ -424,12 +435,13 @@ function next(auto, fromError) {
       if (gen !== Q.gen) return;
       Q.waiting = false;
       if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); } // 기다리는 동안 "다음에 재생"으로 넣은 곡
-      if (takeAuto()) playCurrent(); else if (!fromError) endOfList(auto);
+      if (takeAuto()) playCurrent(); else if (!fromError) endOfList(auto); else pause();
     });
     return;
   }
   endOfList(auto);
 }
+function pause() { if (playerReady) player.pauseVideo(); }
 function endOfList(auto) {
   if (store.repeat === 'all' || !auto) { Q.i = 0; playCurrent(); } else renderAll();
 }
@@ -487,21 +499,23 @@ function setVolume(v) {
 const AUTO_WEIGHTS = { mine: 45, mix: 35, taste: 15, popular: 5 };
 // 싫어요: 아예 막지 않고 덜 나오게. 그 곡 자체, 같은 채널, 그 곡 YouTube 믹스에 있던 곡 (해당되면 곱해짐)
 const DISLIKE = { self: 0.1, artist: 0.5, similar: 0.8 };
+// 링크로 붙여 넣은 곡의 채널 자리 (가수가 아니므로 같은 가수 감점에서 뺀다)
+const LINK_CHANNEL = '링크로 추가';
 function dislikeIndex(disliked) {
   const idx = { ids: new Set(), channels: new Set(), similar: new Set() };
   for (const d of disliked) {
     idx.ids.add(d.t.id);
-    if (d.t.channel) idx.channels.add(d.t.channel);
-    for (const id of d.similar || []) idx.similar.add(id);
+    if (d.t.channel && d.t.channel !== LINK_CHANNEL) idx.channels.add(d.t.channel);
+    for (const id of Array.isArray(d.similar) ? d.similar : []) idx.similar.add(id);
   }
   return idx;
 }
 function penaltyOf(t, idx) {
   return (idx.ids.has(t.id) ? DISLIKE.self : 1) * (idx.channels.has(t.channel) ? DISLIKE.artist : 1) * (idx.similar.has(t.id) ? DISLIKE.similar : 1);
 }
-// 곡 목록(Track 또는 {t,w})을 싫어요 반영한 {t,w}로
+// 곡 목록(Track 또는 {t,w})을 싫어요 반영한 {t,w,w0}로. w0은 감점 전 값 (묶음 비중 계산에 씀)
 function weigh(items, idx) {
-  return items.map(x => (x.t ? { t: x.t, w: x.w * penaltyOf(x.t, idx) } : { t: x, w: penaltyOf(x, idx) }));
+  return items.map(x => (x.t ? { t: x.t, w: x.w * penaltyOf(x.t, idx), w0: x.w0 ?? x.w } : { t: x, w: penaltyOf(x, idx), w0: 1 }));
 }
 function scoreOf(stat, liked) {
   return (stat ? stat.plays - 2 * stat.skips : 0) + (liked ? 3 : 0);
@@ -517,16 +531,20 @@ function minePool(stats, likedTracks) {
   return pool;
 }
 // 비중대로 묶음을 고르고 그 안에서 한 곡. 제외 후 후보가 남은 묶음만 고려하므로 모두 비면 null.
+// 묶음 비중에는 그 묶음이 싫어요로 깎인 만큼(w 합 / w0 합)을 곱한다: 비슷한 곡뿐인 묶음은 덜 뽑힌다.
 function pickNext(pools, weights, exclude, rng) {
-  const avail = {};
+  const avail = {}, pw = {};
   let total = 0;
   for (const k in weights) {
     const items = (pools[k] || []).map(x => (x.t ? x : { t: x, w: 1 })).filter(x => !exclude.has(x.t.id));
-    if (items.length) { avail[k] = items; total += weights[k]; }
+    if (!items.length) continue;
+    const w0 = items.reduce((s, x) => s + (x.w0 ?? x.w), 0);
+    avail[k] = items; pw[k] = weights[k] * (w0 ? items.reduce((s, x) => s + x.w, 0) / w0 : 1);
+    total += pw[k];
   }
   if (!total) return null;
   let r = rng() * total, from;
-  for (from in avail) { r -= weights[from]; if (r < 0) break; }
+  for (from in avail) { r -= pw[from]; if (r < 0) break; }
   const items = avail[from];
   let w = rng() * items.reduce((s, x) => s + x.w, 0);
   for (const x of items) { w -= x.w; if (w < 0) return { t: x.t, from }; }
@@ -574,20 +592,22 @@ function refillAuto() {
   const token = refillingToken = autoToken();
   refilling = (async () => {
     store.disliked.filter(d => !(d.similar && d.similar.length) && (d.tries || 0) < 3).slice(0, 3).forEach(fillSimilar);
-    const mine = minePool(store.stats, store.liked);
-    const seed = Q.list[Q.list.length - 1];
+    const idx = dislikeIndex(store.disliked);
+    // 싫어요 곡은 믹스를 가져올 기준(지금 곡, 내 취향, 최근에 들은 곡)으로 쓰지 않는다
+    const ok = t => !idx.ids.has(t.id);
+    const mine = weigh(minePool(store.stats, store.liked), idx);
+    const seed = [...Q.list].reverse().find(ok);
     const exclude = new Set([...store.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
-    const top = mine.slice().sort((a, b) => b.w - a.w).slice(0, 10);
+    const top = mine.filter(x => ok(x.t)).sort((a, b) => b.w - a.w).slice(0, 10);
     const tasteSeed = top.length ? top[Math.floor(Math.random() * top.length)].t.id : null;
-    let [mix, taste, popular] = await Promise.all([fetchMix(seed.id), tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
+    let [mix, taste, popular] = await Promise.all([seed ? fetchMix(seed.id) : [], tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
     if (mix.filter(t => !exclude.has(t.id)).length < 5) {
       // 기준 곡 믹스가 거의 떨어졌으면 가장 최근에 제대로 들은 곡의 믹스로 보충
-      const lastHeard = Object.values(store.stats).filter(x => x.plays > 0 && x.t.id !== seed.id).sort((a, b) => b.last - a.last)[0];
+      const lastHeard = Object.values(store.stats).filter(x => x.plays > 0 && ok(x.t) && (!seed || x.t.id !== seed.id)).sort((a, b) => b.last - a.last)[0];
       if (lastHeard) mix = mix.concat(await fetchMix(lastHeard.t.id));
     }
     if (token !== autoToken() || !useAuto()) return;
-    const idx = dislikeIndex(store.disliked);
-    const pools = { mine: weigh(mine, idx), mix: weigh(mix, idx), taste: weigh(taste, idx), popular: weigh(popular, idx) };
+    const pools = { mine, mix: weigh(mix, idx), taste: weigh(taste, idx), popular: weigh(popular, idx) };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
       if (!p) break;
@@ -595,7 +615,7 @@ function refillAuto() {
     }
     Q.autoEmpty = !Q.auto.length;
     renderQueue();
-  })().finally(() => { refilling = null; });
+  })().catch(e => console.error(e)).finally(() => { refilling = null; }); // 실패해도 기다리던 next()는 이어지게
   return refilling;
 }
 
@@ -608,7 +628,7 @@ async function search(q) {
   q = q.trim();
   if (!q) return [];
   const id = parseId(q);
-  if (id) return [{ id, title: id, channel: '링크로 추가', duration: '', seconds: 0 }];
+  if (id) return [{ id, title: id, channel: LINK_CHANNEL, duration: '', seconds: 0 }];
   let why = '';
   const gas = setting('searchUrl');
   if (gas) {
@@ -825,6 +845,7 @@ function renderQuickNow() {
   const t = current();
   $('#q-now').hidden = !t;
   if (t) $('#q-title').textContent = t.title;
+  $('#quick [data-act="dislikecur"]').classList.toggle('on', !!t && isDisliked(t.id));
 }
 function renderAll() {
   renderQuickNow();
@@ -883,30 +904,40 @@ function toast(msg) {
 // ---------- 라이브러리 조작 ----------
 function toggleLike(t) {
   if (isLiked(t.id)) store.liked = store.liked.filter(x => x.id !== t.id);
-  else store.liked.unshift(slim(t));
+  else { store.liked.unshift(slim(t)); store.disliked = store.disliked.filter(d => d.t.id !== t.id); }
   save(); renderAll();
 }
 const isDisliked = id => store.disliked.some(d => d.t.id === id);
 // 싫어요: 좋아요는 풀고, 자동 추천에 있던 그 곡은 빼고, 그 곡의 YouTube 믹스를 '비슷한 곡'으로 기억한다
+// 싫어요 해제하면 그때 풀었던 좋아요도 되돌린다 (liked: true로 기억)
 function toggleDislike(t) {
-  if (isDisliked(t.id)) {
-    store.disliked = store.disliked.filter(d => d.t.id !== t.id);
+  const old = store.disliked.find(d => d.t.id === t.id);
+  if (old) {
+    store.disliked = store.disliked.filter(d => d !== old);
+    if (old.liked && !isLiked(t.id)) store.liked.unshift(old.t);
     save(); renderAll(); toast('싫어요를 취소했어요');
     return;
   }
   const d = { t: slim(t), similar: [], at: Date.now() };
+  if (isLiked(t.id)) d.liked = true;
   store.disliked.unshift(d);
   if (store.disliked.length > 200) store.disliked.length = 200;
   store.liked = store.liked.filter(x => x.id !== t.id);
-  Q.auto = Q.auto.filter(x => x.id !== t.id);
+  // 지금 추천은 이 곡 기준으로 뽑혔을 수 있으니 버리고 다시 채운다
+  Q.auto = []; Q.autoEpoch++;
   save(); renderAll(); toast('이 곡과 비슷한 곡이 덜 나와요');
   fillSimilar(d);
+  refillAuto();
 }
-// 서버가 실패해서 비슷한 곡이 비었으면 자동 추천을 채울 때 다시 시도한다 (한 곡당 3번까지)
+// 서버가 실패해서 비슷한 곡이 비었으면 자동 추천을 채울 때 다시 시도한다 (실제로 요청한 횟수로 한 곡당 3번까지)
+const similarPending = new Set();
 function fillSimilar(d) {
-  d.tries = (d.tries || 0) + 1;
-  return fetchMix(d.t.id).then(r => {
-    if (r.length) { d.similar = r.map(x => x.id).filter(id => id !== d.t.id); delete d.tries; }
+  if (similarPending.has(d.t.id)) return;
+  similarPending.add(d.t.id);
+  fetchMix(d.t.id).then(r => {
+    similarPending.delete(d.t.id);
+    d.similar = r.map(x => x.id).filter(id => id !== d.t.id);
+    if (d.similar.length) delete d.tries; else d.tries = (d.tries || 0) + 1;
     save();
   });
 }
@@ -945,9 +976,12 @@ document.addEventListener('click', e => {
     case 'dislikecur': {
       const t = current();
       if (!t) break;
-      const on = !isDisliked(t.id);
+      // 이미 싫어요면 해제. 단 넘길 추천을 기다리는 중에 또 누른 건 무시
+      if (isDisliked(t.id)) { if (!Q.waiting) toggleDislike(t); break; }
       toggleDislike(t);
-      if (on) next(false);
+      // 넘길 곡이 없으면 처음(=이 곡)으로 돌아가지 않고 멈춘다
+      if (Q.i + 1 < Q.list.length || useAuto() || (store.repeat === 'all' && Q.list.length > 1)) next(false, true);
+      else pause();
       break;
     }
     case 'undislike': toggleDislike(store.disliked[i].t); break;
@@ -1017,9 +1051,21 @@ document.addEventListener('change', e => {
   if (t.id === 'import' && t.files[0]) {
     t.files[0].text().then(txt => {
       const d = JSON.parse(txt);
-      for (const x of d.liked || []) if (!isLiked(x.id)) store.liked.push(x);
-      for (const p of d.playlists || []) if (!plById(p.id)) store.playlists.push(p);
-      for (const x of d.disliked || []) if (x && x.t && !isDisliked(x.t.id)) store.disliked.push(x);
+      // 파일 내용은 믿지 않는다: 영상 ID 형식이 맞는 곡만, 필드는 필요한 것만 받아 온다
+      const arr = a => (Array.isArray(a) ? a : []);
+      const track = x => (x && /^[\w-]{11}$/.test(x.id) ? { id: x.id, title: String(x.title ?? x.id), channel: String(x.channel ?? ''), duration: String(x.duration ?? ''), seconds: +x.seconds || 0 } : null);
+      const tracks = a => arr(a).map(track).filter(Boolean);
+      for (const x of tracks(d.liked)) if (!isLiked(x.id)) store.liked.push(x);
+      for (const p of arr(d.playlists)) {
+        if (!p || !/^[\w-]{1,24}$/.test(p.id) || plById(p.id)) continue;
+        store.playlists.push({ id: p.id, name: String(p.name || '가져온 플레이리스트'), tracks: tracks(p.tracks) });
+      }
+      for (const x of arr(d.disliked)) {
+        const t = x && track(x.t);
+        if (!t || isDisliked(t.id) || isLiked(t.id)) continue;
+        store.disliked.push({ t, similar: arr(x.similar).filter(id => typeof id === 'string'), at: +x.at || 0, ...(x.liked ? { liked: true } : {}) });
+      }
+      if (store.disliked.length > 200) store.disliked.length = 200;
       save(); renderAll(); toast('가져왔어요');
     }).catch(() => toast('파일을 읽지 못했어요'));
   }
@@ -1057,6 +1103,14 @@ window.addEventListener('keydown', e => {
     else if (e.code === 'KeyV') { go(route.name === 'video' ? lastRoute : { name: 'video' }); renderNow(); }
   }
 }, true);
+
+if (OLD_SITE) {
+  const bar = document.createElement('div');
+  bar.id = 'moved';
+  bar.innerHTML = `이 주소는 더 이상 업데이트되지 않아요. 기록은 자동으로 안 옮겨져요: <button data-act="export">기록 내보내기</button> → <a href="${NEW_SITE}">새 주소</a>의 설정에서 가져오기 <button class="x" title="닫기">✕</button>`;
+  bar.querySelector('.x').onclick = () => bar.remove();
+  document.body.appendChild(bar);
+}
 </script>
 </body>
 </html>
