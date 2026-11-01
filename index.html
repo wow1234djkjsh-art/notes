@@ -950,7 +950,10 @@ async function downloadTrack(t, fmt) {
   try {
     for (;;) {
       await new Promise(r => setTimeout(r, 1000));
-      const st = await (await fetch(`${base}/jobs/${job}`)).json();
+      const res = await fetch(`${base}/jobs/${job}`);
+      // 서버가 다시 켜지면 작업이 사라진다: 계속 기다리지 않고 알려 준다
+      if (res.status === 404) return toast('받지 못했어요: 다운로드 서버가 다시 켜졌어요. 한 번 더 눌러 주세요');
+      const st = await res.json();
       if (st.state === 'error') return toast(`받지 못했어요: ${st.error || ''}`);
       if (st.state === 'done') break;
       toast(`${label} 만드는 중… ${st.progress || 0}%`);
