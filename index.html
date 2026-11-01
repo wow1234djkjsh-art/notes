@@ -277,6 +277,8 @@ const CONFIG = {
   // Google Apps Script 웹앱 주소 (배포 후 입력). 설정 화면에서 바꿀 수도 있음.
   searchUrl: 'https://script.google.com/macros/s/AKfycbxtPnDquOCzlwqOwr6IYV79qvNolXQonZ0WHcsjrBctRqhmjbbrkIjCT4Xkt6Npwa-lLw/exec',
   invidious: 'https://yt.chocolatemoo53.com',
+  // 이 컴퓨터에서 도는 다운로드 서버 (~/stealth-music/dl)
+  dlUrl: 'http://localhost:8790',
   panicUrl: 'https://docs.google.com/document/u/0/',
 };
 
@@ -813,7 +815,8 @@ function renderNow() {
     <img src="${thumb(t.id)}" alt="">
     <div style="min-width:0"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div>
     <button data-act="likecur" class="${isLiked(t.id) ? 'liked-on' : ''}" style="color:#b3b3b3" title="좋아요">♥</button>
-    <button data-act="dislikecur" class="${isDisliked(t.id) ? 'liked-on' : ''}" style="color:#b3b3b3" title="싫어요">⊖</button>` : '';
+    <button data-act="dislikecur" class="${isDisliked(t.id) ? 'liked-on' : ''}" style="color:#b3b3b3" title="싫어요">⊖</button>
+    <button data-act="dlcur" style="color:#b3b3b3" title="MP3/MP4로 받기">⤓</button>` : '';
   $('#b-shuffle').classList.toggle('on', store.shuffle);
   $('#b-repeat').classList.toggle('on', store.repeat !== 'off');
   $('#b-repeat').innerHTML = '↻' + (store.repeat === 'one' ? '<span class="one">1</span>' : '');
@@ -868,10 +871,22 @@ function showMenu(btn, key, i) {
     <button data-act="m-queue">대기열에 추가</button>
     <button data-act="m-like">${isLiked(menuTrack.id) ? '좋아요 취소' : '좋아요'}</button>
     <button data-act="m-dislike">${isDisliked(menuTrack.id) ? '싫어요 취소' : '싫어요'}</button>
+    ${DL_ITEMS}
     <hr>
     ${store.playlists.map(p => `<button data-act="m-addpl" data-id="${p.id}">＋ ${esc(p.name)}</button>`).join('')}
     <button data-act="m-newpl">＋ 새 플레이리스트에 추가</button>
     ${key.startsWith('pl:') ? '<hr><button data-act="m-remove">이 플레이리스트에서 제거</button>' : ''}`;
+  placeMenu(btn);
+}
+const DL_ITEMS = '<button data-act="m-dl" data-fmt="mp3">MP3로 받기</button><button data-act="m-dl" data-fmt="mp4">MP4로 받기</button>';
+// 재생 바 ⤓: 지금 곡 받기 메뉴
+function showDlMenu(btn) {
+  menuTrack = current(); menuKey = null; menuIdx = -1;
+  $('#menu').innerHTML = DL_ITEMS;
+  placeMenu(btn);
+}
+function placeMenu(btn) {
+  const m = $('#menu');
   m.hidden = false;
   const r = btn.getBoundingClientRect();
   const h = m.offsetHeight, w = m.offsetWidth;
@@ -885,6 +900,40 @@ function toast(msg) {
   const t = $('#toast');
   t.textContent = msg; t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 1800);
+}
+
+// ---------- 다운로드 (이 컴퓨터의 다운로드 서버가 변환) ----------
+const DL_OFF = '다운로드는 이 컴퓨터에서만 돼요 (다운로드 서버가 꺼져 있어요)';
+function fileNameOf(cd) {
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd || '');
+  if (star) try { return decodeURIComponent(star[1]); } catch (e) {}
+  const plain = /filename="([^"]+)"/i.exec(cd || '');
+  return plain ? plain[1] : '';
+}
+async function downloadTrack(t, fmt) {
+  const base = setting('dlUrl'), label = fmt.toUpperCase();
+  let job;
+  try {
+    const r = await fetch(base + '/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, fmt }) });
+    if (!r.ok) throw new Error(r.status);
+    job = (await r.json()).job;
+  } catch (e) { return toast(DL_OFF); }
+  toast(`${label} 만드는 중… 0%`);
+  try {
+    for (;;) {
+      await new Promise(r => setTimeout(r, 1000));
+      const st = await (await fetch(`${base}/jobs/${job}`)).json();
+      if (st.state === 'error') return toast(`받지 못했어요: ${st.error || ''}`);
+      if (st.state === 'done') break;
+      toast(`${label} 만드는 중… ${st.progress || 0}%`);
+    }
+    const r = await fetch(`${base}/jobs/${job}/file`);
+    if (!r.ok) throw new Error(r.status);
+    const u = URL.createObjectURL(await r.blob()), link = document.createElement('a');
+    link.href = u; link.download = fileNameOf(r.headers.get('Content-Disposition')) || `${t.title}.${fmt}`;
+    link.click(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+    toast('다운로드 폴더에 저장했어요');
+  } catch (e) { toast(DL_OFF); }
 }
 
 // ---------- 라이브러리 조작 ----------
@@ -959,6 +1008,8 @@ document.addEventListener('click', e => {
     case 'm-queue': addToQueue(menuTrack); hideMenu(); break;
     case 'm-like': toggleLike(menuTrack); hideMenu(); break;
     case 'm-dislike': toggleDislike(menuTrack); hideMenu(); break;
+    case 'm-dl': downloadTrack(menuTrack, el.dataset.fmt); hideMenu(); break;
+    case 'dlcur': if (current()) showDlMenu(el); break;
     case 'dislikecur': {
       const t = current();
       if (!t) break;
