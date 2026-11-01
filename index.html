@@ -289,11 +289,15 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s /
 
 // ---------- 저장소 ----------
 const KEY = 'sm.v1';
-const defaults = () => ({ liked: [], disliked: [], playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, showQueue: true, doc: null, settings: {} });
+const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, showQueue: true, doc: null, settings: {} });
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
 let saveTimer;
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }, 200); }
 const setting = k => store.settings[k] || CONFIG[k];
+// 영상/음악: 음악 화면에서 📺 영상 화면이 열려 있으면 영상, 그 밖(음악 화면, 빠른 패널)은 음악.
+// 기록·좋아요·싫어요는 쪽마다 따로: 음악은 store 최상위(옛 데이터 그대로), 영상은 store.video
+const kind = () => (mode === 'music' && route.name === 'video' ? 'video' : 'music');
+const bucket = (k = kind()) => (k === 'video' ? store.video : store);
 const slim = t => ({ id: t.id, title: t.title, channel: t.channel, duration: t.duration, seconds: t.seconds });
 
 // ---------- 문서 화면 ----------
@@ -403,7 +407,8 @@ function playCurrent() {
   if (!t) return;
   counted = false;
   if (playerReady) player.loadVideoById(t.id); else pendingId = t.id;
-  store.recent = [slim(t), ...store.recent.filter(x => x.id !== t.id)].slice(0, 30);
+  const B = bucket();
+  B.recent = [slim(t), ...B.recent.filter(x => x.id !== t.id)].slice(0, 30);
   save();
   renderAll();
   refillAuto();
@@ -437,10 +442,11 @@ function endOfList(auto) {
 let counted = false;
 const STATS_MAX = 500;
 function statFor(t) {
-  const s = store.stats[t.id] || (store.stats[t.id] = { t: slim(t), plays: 0, skips: 0, last: 0 });
+  const stats = bucket().stats;
+  const s = stats[t.id] || (stats[t.id] = { t: slim(t), plays: 0, skips: 0, last: 0 });
   s.last = Date.now();
-  const ids = Object.keys(store.stats);
-  if (ids.length > STATS_MAX) ids.sort((a, b) => store.stats[a].last - store.stats[b].last).slice(0, ids.length - STATS_MAX).forEach(id => delete store.stats[id]);
+  const ids = Object.keys(stats);
+  if (ids.length > STATS_MAX) ids.sort((a, b) => stats[a].last - stats[b].last).slice(0, ids.length - STATS_MAX).forEach(id => delete stats[id]);
   return s;
 }
 function noteListen() {
@@ -572,26 +578,28 @@ const fetchPopular = () => popularP || (popularP = search('인기 음악')
   .then(r => r.filter(t => t.seconds >= 60 && t.seconds <= 600)).catch(() => [])
   .then(r => { if (!r.length) popularP = null; return r; }));
 let refilling = null, refillingToken = '';
-const autoToken = () => Q.gen + ':' + Q.autoEpoch;
+// 채우는 도중 대기열이 바뀌거나 추천이 무효가 되거나 영상/음악 쪽이 바뀌면 결과를 버린다
+const autoToken = () => Q.gen + ':' + Q.autoEpoch + ':' + kind();
 function refillAuto() {
   // 이전 대기열(또는 무효가 된 추천)의 채우기가 아직 도는 중이면, 끝난 뒤 지금 기준으로 다시 채운다
   if (refilling) return refillingToken === autoToken() ? refilling : refilling.then(() => refillAuto());
   if (!useAuto() || Q.auto.length >= 5 || !current() || Q.list.length - Q.i - 1 > 2) return Promise.resolve();
   const token = refillingToken = autoToken();
   refilling = (async () => {
-    store.disliked.filter(d => !(d.similar && d.similar.length) && (d.tries || 0) < 3).slice(0, 3).forEach(fillSimilar);
-    const idx = dislikeIndex(store.disliked);
+    const B = bucket();
+    B.disliked.filter(d => !(d.similar && d.similar.length) && (d.tries || 0) < 3).slice(0, 3).forEach(fillSimilar);
+    const idx = dislikeIndex(B.disliked);
     // 싫어요 곡은 믹스를 가져올 기준(지금 곡, 내 취향, 최근에 들은 곡)으로 쓰지 않는다
     const ok = t => !idx.ids.has(t.id);
-    const mine = weigh(minePool(store.stats, store.liked), idx);
+    const mine = weigh(minePool(B.stats, B.liked), idx);
     const seed = [...Q.list].reverse().find(ok);
-    const exclude = new Set([...store.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
+    const exclude = new Set([...store.recent.slice(0, 20), ...store.video.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
     const top = mine.filter(x => ok(x.t)).sort((a, b) => b.w - a.w).slice(0, 10);
     const tasteSeed = top.length ? top[Math.floor(Math.random() * top.length)].t.id : null;
     let [mix, taste, popular] = await Promise.all([seed ? fetchMix(seed.id) : [], tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
     if (mix.filter(t => !exclude.has(t.id)).length < 5) {
       // 기준 곡 믹스가 거의 떨어졌으면 가장 최근에 제대로 들은 곡의 믹스로 보충
-      const lastHeard = Object.values(store.stats).filter(x => x.plays > 0 && ok(x.t) && (!seed || x.t.id !== seed.id)).sort((a, b) => b.last - a.last)[0];
+      const lastHeard = Object.values(B.stats).filter(x => x.plays > 0 && ok(x.t) && (!seed || x.t.id !== seed.id)).sort((a, b) => b.last - a.last)[0];
       if (lastHeard) mix = mix.concat(await fetchMix(lastHeard.t.id));
     }
     if (token !== autoToken() || !useAuto()) return;
@@ -644,6 +652,15 @@ function setMode(m) {
   if (m === 'music') { toggleQuick(false); renderAll(); }
   hideMenu();
   placePlayer();
+  onKindChange();
+}
+// 영상/음악 쪽이 바뀌면 지금 추천은 버리고 그쪽 기준으로 다시 채운다
+let lastKind = 'music';
+function onKindChange() {
+  if (kind() === lastKind) return;
+  lastKind = kind();
+  Q.auto = []; Q.autoEpoch++;
+  refillAuto(); renderQueue();
 }
 function toggleQuick(force) {
   quickOpen = force ?? !quickOpen;
@@ -661,6 +678,7 @@ function go(r) {
   renderLib();
   $('#main').scrollTop = 0;
   if (r.name === 'search') { const i = $('#m-q'); i.focus(); i.select(); }
+  onKindChange();
 }
 function panic() {
   try { player && player.pauseVideo(); } catch (e) {}
@@ -691,7 +709,9 @@ window.addEventListener('blur', () => setTimeout(() => {
 
 // ---------- 렌더링 ----------
 const lists = {};
-const isLiked = id => store.liked.some(t => t.id === id);
+const isLiked = (id, k) => bucket(k).liked.some(t => t.id === id);
+// 목록에서 누른 ♥/⋯는 그 목록의 쪽 (좋아요 표시한 영상 목록이면 영상)
+const listKind = key => (key === 'liked' && route.name === 'liked' && route.id === 'video' ? 'video' : kind());
 const plById = id => store.playlists.find(p => p.id === id);
 
 function trackRows(key, arr, opts = {}) {
@@ -704,7 +724,7 @@ function trackRows(key, arr, opts = {}) {
       <img src="${thumb(t.id)}" loading="lazy" alt="">
       <div style="min-width:0"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div>
       <span>${esc(t.duration || '')}</span>
-      <button data-act="like" data-list="${key}" data-i="${i}" class="${isLiked(t.id) ? 'liked-on' : ''}" title="좋아요">♥</button>
+      <button data-act="like" data-list="${key}" data-i="${i}" class="${isLiked(t.id, listKind(key)) ? 'liked-on' : ''}" title="좋아요">♥</button>
       <button data-act="more" data-list="${key}" data-i="${i}" title="더보기">⋯</button>
     </div>`).join('');
 }
@@ -712,7 +732,8 @@ function trackRows(key, arr, opts = {}) {
 function renderLib() {
   const on = (n, id) => route.name === n && (!id || route.id === id) ? 'on' : '';
   $('#lib').innerHTML = `
-    <button class="${on('liked')}" data-act="go" data-route="liked"><span class="m-sq" style="background:linear-gradient(135deg,#4a3a9c,#9fd3ff)">♥</span><span class="m-libtxt"><div>좋아요 표시한 곡</div><small>플레이리스트 · ${store.liked.length}곡</small></span></button>
+    <button class="${route.name === 'liked' && route.id !== 'video' ? 'on' : ''}" data-act="go" data-route="liked"><span class="m-sq" style="background:linear-gradient(135deg,#4a3a9c,#9fd3ff)">♥</span><span class="m-libtxt"><div>좋아요 표시한 곡</div><small>플레이리스트 · ${store.liked.length}곡</small></span></button>
+    <button class="${on('liked', 'video')}" data-act="go" data-route="liked" data-id="video"><span class="m-sq" style="background:linear-gradient(135deg,#9c3a4a,#ffd39f)">📺</span><span class="m-libtxt"><div>좋아요 표시한 영상</div><small>플레이리스트 · ${store.video.liked.length}곡</small></span></button>
     ${store.playlists.map(p => `
       <button class="${on('playlist', p.id)}" data-act="go" data-route="playlist" data-id="${p.id}">
         ${p.tracks[0] ? `<img class="m-sq" src="${thumb(p.tracks[0].id)}" alt="">` : '<span class="m-sq">♫</span>'}
@@ -742,10 +763,11 @@ function renderMain() {
       <form class="m-searchbar" data-form="search"><input id="m-q" type="text" placeholder="어떤 노래를 듣고 싶으세요? (YouTube 링크도 가능)" value="${esc(s.q)}" autocomplete="off"></form>
       ${s.loading ? '<p class="m-hint">검색 중…</p>' : s.error ? `<p class="m-hint">${esc(s.error)}</p>` : trackRows('search', s.results, { empty: s.q ? '결과가 없어요' : '검색어를 입력하고 Enter' })}`;
   } else if (r.name === 'liked') {
+    const v = r.id === 'video', liked = bucket(v ? 'video' : 'music').liked;
     el.innerHTML = `
-      <div class="hero liked"><div class="art" style="background:linear-gradient(135deg,#4a3a9c,#9fd3ff)">♥</div><div><small>플레이리스트</small><h1>좋아요 표시한 곡</h1><small>${store.liked.length}곡</small></div></div>
+      <div class="hero liked"><div class="art" style="background:linear-gradient(135deg,${v ? '#9c3a4a,#ffd39f' : '#4a3a9c,#9fd3ff'})">${v ? '📺' : '♥'}</div><div><small>플레이리스트</small><h1>${v ? '좋아요 표시한 영상' : '좋아요 표시한 곡'}</h1><small>${liked.length}곡</small></div></div>
       <div class="actions"><button class="bigplay" data-act="playall" data-list="liked">▶</button><button class="pill" data-act="shuffleall" data-list="liked">셔플 재생</button></div>
-      ${trackRows('liked', store.liked, { empty: '♥를 누른 곡이 여기에 모여요' })}`;
+      ${trackRows('liked', liked, { empty: v ? '📺 영상 화면에서 ♥를 누른 영상이 여기에 모여요' : '♥를 누른 곡이 여기에 모여요' })}`;
   } else if (r.name === 'playlist') {
     const p = plById(r.id);
     if (!p) return go({ name: 'home' });
@@ -773,8 +795,9 @@ function renderMain() {
         <input type="text" data-setting="panicUrl" value="${esc(store.settings.panicUrl || '')}" placeholder="${esc(CONFIG.panicUrl)}">
         <h3>싫어요 표시한 곡</h3>
         <p class="m-hint">자동 추천에서 이 곡과 같은 가수, 비슷한 곡이 덜 나와요. 해제하면 원래대로 돌아가요.</p>
-        <div data-dislike-list>${store.disliked.length ? store.disliked.map((d, k) => `
-          <div class="trk"><img src="${thumb(d.t.id)}" alt="" loading="lazy"><div style="min-width:0"><div class="t1">${esc(d.t.title)}</div><div class="t2">${esc(d.t.channel)}</div></div><button class="pill" data-act="undislike" data-i="${k}">해제</button></div>`).join('') : '<p class="m-hint">없음</p>'}</div>
+        ${dislikeList('music')}
+        <h3>싫어요 표시한 영상</h3>
+        ${dislikeList('video')}
         <h3>라이브러리 옮기기</h3>
         <p class="m-hint">좋아요·플레이리스트는 이 브라우저에만 저장돼요. 다른 PC로 옮길 때 파일로 내보내고 가져오세요.</p>
         <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="margin:0;cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label></div>
@@ -785,6 +808,11 @@ function renderMain() {
   placePlayer();
 }
 
+function dislikeList(k) {
+  const list = bucket(k).disliked;
+  return `<div data-dislike-list="${k}">${list.length ? list.map((d, i) => `
+    <div class="trk"><img src="${thumb(d.t.id)}" alt="" loading="lazy"><div style="min-width:0"><div class="t1">${esc(d.t.title)}</div><div class="t2">${esc(d.t.channel)}</div></div><button class="pill" data-act="undislike" data-kind="${k}" data-i="${i}">해제</button></div>`).join('') : '<p class="m-hint">없음</p>'}</div>`;
+}
 function greeting() {
   const h = new Date().getHours();
   return h < 6 ? '늦은 밤이에요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '좋은 오후예요' : '좋은 저녁이에요';
@@ -862,15 +890,15 @@ $('#vol').value = store.volume;
 $('#vol').addEventListener('input', e => setVolume(+e.target.value));
 
 // ---------- 메뉴 / 토스트 ----------
-let menuTrack = null, menuKey = null, menuIdx = -1;
+let menuTrack = null, menuKey = null, menuIdx = -1, menuKind = 'music';
 function showMenu(btn, key, i) {
-  menuTrack = lists[key][i]; menuKey = key; menuIdx = i;
+  menuTrack = lists[key][i]; menuKey = key; menuIdx = i; menuKind = listKind(key);
   const m = $('#menu');
   m.innerHTML = `
     <button data-act="m-next">다음에 재생</button>
     <button data-act="m-queue">대기열에 추가</button>
-    <button data-act="m-like">${isLiked(menuTrack.id) ? '좋아요 취소' : '좋아요'}</button>
-    <button data-act="m-dislike">${isDisliked(menuTrack.id) ? '싫어요 취소' : '싫어요'}</button>
+    <button data-act="m-like">${isLiked(menuTrack.id, menuKind) ? '좋아요 취소' : '좋아요'}</button>
+    <button data-act="m-dislike">${isDisliked(menuTrack.id, menuKind) ? '싫어요 취소' : '싫어요'}</button>
     ${DL_ITEMS}
     <hr>
     ${store.playlists.map(p => `<button data-act="m-addpl" data-id="${p.id}">＋ ${esc(p.name)}</button>`).join('')}
@@ -937,27 +965,29 @@ async function downloadTrack(t, fmt) {
 }
 
 // ---------- 라이브러리 조작 ----------
-function toggleLike(t) {
-  if (isLiked(t.id)) store.liked = store.liked.filter(x => x.id !== t.id);
-  else { store.liked.unshift(slim(t)); store.disliked = store.disliked.filter(d => d.t.id !== t.id); }
+function toggleLike(t, k = kind()) {
+  const B = bucket(k);
+  if (isLiked(t.id, k)) B.liked = B.liked.filter(x => x.id !== t.id);
+  else { B.liked.unshift(slim(t)); B.disliked = B.disliked.filter(d => d.t.id !== t.id); }
   save(); renderAll();
 }
-const isDisliked = id => store.disliked.some(d => d.t.id === id);
+const isDisliked = (id, k) => bucket(k).disliked.some(d => d.t.id === id);
 // 싫어요: 좋아요는 풀고, 자동 추천에 있던 그 곡은 빼고, 그 곡의 YouTube 믹스를 '비슷한 곡'으로 기억한다
 // 싫어요 해제하면 그때 풀었던 좋아요도 되돌린다 (liked: true로 기억)
-function toggleDislike(t) {
-  const old = store.disliked.find(d => d.t.id === t.id);
+function toggleDislike(t, k = kind()) {
+  const B = bucket(k);
+  const old = B.disliked.find(d => d.t.id === t.id);
   if (old) {
-    store.disliked = store.disliked.filter(d => d !== old);
-    if (old.liked && !isLiked(t.id)) store.liked.unshift(old.t);
+    B.disliked = B.disliked.filter(d => d !== old);
+    if (old.liked && !isLiked(t.id, k)) B.liked.unshift(old.t);
     save(); renderAll(); toast('싫어요를 취소했어요');
     return;
   }
   const d = { t: slim(t), similar: [], at: Date.now() };
-  if (isLiked(t.id)) d.liked = true;
-  store.disliked.unshift(d);
-  if (store.disliked.length > 200) store.disliked.length = 200;
-  store.liked = store.liked.filter(x => x.id !== t.id);
+  if (isLiked(t.id, k)) d.liked = true;
+  B.disliked.unshift(d);
+  if (B.disliked.length > 200) B.disliked.length = 200;
+  B.liked = B.liked.filter(x => x.id !== t.id);
   // 지금 추천은 이 곡 기준으로 뽑혔을 수 있으니 버리고 다시 채운다
   Q.auto = []; Q.autoEpoch++;
   save(); renderAll(); toast('이 곡과 비슷한 곡이 덜 나와요');
@@ -1001,13 +1031,13 @@ document.addEventListener('click', e => {
       break;
     case 'playall': if (lists[key].length) { store.shuffle = false; save(); setQueue(lists[key], 0); } break;
     case 'shuffleall': if (lists[key].length) { store.shuffle = true; save(); setQueue(lists[key], Math.floor(Math.random() * lists[key].length)); } break;
-    case 'like': toggleLike(lists[key][i]); break;
+    case 'like': toggleLike(lists[key][i], listKind(key)); break;
     case 'likecur': if (current()) toggleLike(current()); break;
     case 'more': showMenu(el, key, i); break;
     case 'm-next': playNext(menuTrack); hideMenu(); break;
     case 'm-queue': addToQueue(menuTrack); hideMenu(); break;
-    case 'm-like': toggleLike(menuTrack); hideMenu(); break;
-    case 'm-dislike': toggleDislike(menuTrack); hideMenu(); break;
+    case 'm-like': toggleLike(menuTrack, menuKind); hideMenu(); break;
+    case 'm-dislike': toggleDislike(menuTrack, menuKind); hideMenu(); break;
     case 'm-dl': downloadTrack(menuTrack, el.dataset.fmt); hideMenu(); break;
     case 'dlcur': if (current()) showDlMenu(el); break;
     case 'dislikecur': {
@@ -1021,7 +1051,7 @@ document.addEventListener('click', e => {
       else pause();
       break;
     }
-    case 'undislike': toggleDislike(store.disliked[i].t); break;
+    case 'undislike': { const k = el.dataset.kind; toggleDislike(bucket(k).disliked[i].t, k); break; }
     case 'm-addpl': addToPlaylist(plById(el.dataset.id), menuTrack); hideMenu(); break;
     case 'm-newpl': { const p = newPlaylist(menuTrack); hideMenu(); toast(`'${p.name}'을 만들었어요`); renderAll(); break; }
     case 'm-remove': { const p = plById(menuKey.slice(3)); p.tracks.splice(menuIdx, 1); save(); hideMenu(); renderAll(); break; }
@@ -1058,7 +1088,7 @@ document.addEventListener('click', e => {
     case 'queue': store.showQueue = !store.showQueue; save(); renderAll(); break;
     case 'quickclose': toggleQuick(false); break;
     case 'export': {
-      const blob = new Blob([JSON.stringify({ liked: store.liked, playlists: store.playlists, disliked: store.disliked }, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify({ liked: store.liked, playlists: store.playlists, disliked: store.disliked, video: { liked: store.video.liked, disliked: store.video.disliked } }, null, 2)], { type: 'application/json' });
       const u = URL.createObjectURL(blob), link = document.createElement('a');
       link.href = u; link.download = 'library.json'; link.click(); setTimeout(() => URL.revokeObjectURL(u), 1000);
       break;
@@ -1092,17 +1122,23 @@ document.addEventListener('change', e => {
       const arr = a => (Array.isArray(a) ? a : []);
       const track = x => (x && /^[\w-]{11}$/.test(x.id) ? { id: x.id, title: String(x.title ?? x.id), channel: String(x.channel ?? ''), duration: String(x.duration ?? ''), seconds: +x.seconds || 0 } : null);
       const tracks = a => arr(a).map(track).filter(Boolean);
-      for (const x of tracks(d.liked)) if (!isLiked(x.id)) store.liked.push(x);
+      // 좋아요·싫어요는 음악(최상위)과 영상(video) 쪽을 각각 합친다
+      const merge = (src, k) => {
+        const B = bucket(k);
+        for (const x of tracks(src && src.liked)) if (!isLiked(x.id, k)) B.liked.push(x);
+        for (const x of arr(src && src.disliked)) {
+          const t = x && track(x.t);
+          if (!t || isDisliked(t.id, k) || isLiked(t.id, k)) continue;
+          B.disliked.push({ t, similar: arr(x.similar).filter(id => typeof id === 'string'), at: +x.at || 0, ...(x.liked ? { liked: true } : {}) });
+        }
+        if (B.disliked.length > 200) B.disliked.length = 200;
+      };
+      merge(d, 'music');
+      merge(d.video, 'video');
       for (const p of arr(d.playlists)) {
         if (!p || !/^[\w-]{1,24}$/.test(p.id) || plById(p.id)) continue;
         store.playlists.push({ id: p.id, name: String(p.name || '가져온 플레이리스트'), tracks: tracks(p.tracks) });
       }
-      for (const x of arr(d.disliked)) {
-        const t = x && track(x.t);
-        if (!t || isDisliked(t.id) || isLiked(t.id)) continue;
-        store.disliked.push({ t, similar: arr(x.similar).filter(id => typeof id === 'string'), at: +x.at || 0, ...(x.liked ? { liked: true } : {}) });
-      }
-      if (store.disliked.length > 200) store.disliked.length = 200;
       save(); renderAll(); toast('가져왔어요');
     }).catch(() => toast('파일을 읽지 못했어요'));
   }
