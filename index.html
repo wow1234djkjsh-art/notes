@@ -2,17 +2,6 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<script>
-  // 옛 GitHub Pages 주소(광고가 나옴)로 오면 러버블로 보낸다. 여기에 저장된 기록이 있으면 (또는 #stay면) 남아서 내보내기 안내를 띄운다.
-  const NEW_SITE = 'https://blank-canvas-github-launchpad.lovable.app/';
-  const OLD_SITE = location.hostname.endsWith('github.io') && (() => {
-    let s = null;
-    try { s = JSON.parse(localStorage.getItem('sm.v1')); } catch (e) {}
-    const has = !!s && ((s.liked || []).length || (s.playlists || []).length || Object.keys(s.stats || {}).length || (s.disliked || []).length);
-    if (!has && location.hash !== '#stay') { location.replace(NEW_SITE); return false; }
-    return true;
-  })();
-</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>제목 없는 문서 - Google Docs</title>
@@ -190,9 +179,6 @@
   #quick .q-ctl button { flex: 1; background: #f1f3f4; border-radius: 6px; padding: 5px 0; font-size: 12px; color: #3c4043; }
   #quick .q-ctl button:hover { background: #e8eaed; }
   #quick .q-ctl button.on { background: #d2e3fc; }
-  #moved { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #fef7e0; color: #3c4043; border-bottom: 1px solid #f9e2a6; padding: 8px 16px; font-size: 13px; text-align: center; }
-  #moved button, #moved a { color: #1a73e8; font-size: 13px; text-decoration: underline; }
-  #moved .x { text-decoration: none; color: #5f6368; margin-left: 8px; }
 
   /* ---------- 플레이어 / 기타 ---------- */
   #yt-wrap { position: fixed; z-index: 30; }
@@ -1104,13 +1090,6 @@ window.addEventListener('keydown', e => {
   }
 }, true);
 
-if (OLD_SITE) {
-  const bar = document.createElement('div');
-  bar.id = 'moved';
-  bar.innerHTML = `이 주소는 더 이상 업데이트되지 않아요. 기록은 자동으로 안 옮겨져요: <button data-act="export">기록 내보내기</button> → <a href="${NEW_SITE}">새 주소</a>의 설정에서 가져오기 <button class="x" title="닫기">✕</button>`;
-  bar.querySelector('.x').onclick = () => bar.remove();
-  document.body.appendChild(bar);
-}
 </script>
 </body>
 </html>

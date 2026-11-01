@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>제목 없는 문서</title>
+<script>
+  // 옛 GitHub Pages 주소. 여기 저장된 기록이 없으면 (그리고 #stay가 아니면) 새 주소로 보낸다.
+  const NEW_SITE = 'https://blank-canvas-github-launchpad.lovable.app/';
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem('sm.v1')); } catch (e) {}
+  const has = !!saved && ((saved.liked || []).length || (saved.playlists || []).length || Object.keys(saved.stats || {}).length || (saved.disliked || []).length);
+  if (!has && location.hash !== '#stay') location.replace(NEW_SITE);
+</script>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8f9fa; font: 14px/1.6 system-ui, sans-serif; color: #3c4043; }
+  #moved { background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 20px 24px; max-width: 440px; margin: 16px; }
+  #moved button, #moved a { color: #1a73e8; font: inherit; text-decoration: underline; background: none; border: 0; padding: 0; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="moved">
+  <p>이 주소는 더 이상 쓰지 않아요. 새 주소: <a href="https://blank-canvas-github-launchpad.lovable.app/">새 주소로 가기</a></p>
+  <p>여기 있던 기록은 자동으로 안 옮겨져요. <button data-act="export">기록 내보내기</button>를 누른 뒤, 새 주소의 설정 → 가져오기에서 그 파일을 고르세요.</p>
+</div>
+<script>
+  document.querySelector('[data-act="export"]').onclick = () => {
+    const s = saved || {};
+    const blob = new Blob([JSON.stringify({ liked: s.liked || [], playlists: s.playlists || [], disliked: s.disliked || [] }, null, 2)], { type: 'application/json' });
+    const u = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = u; link.download = 'library.json'; link.click(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+  };
+</script>
+</body>
+</html>
