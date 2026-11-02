@@ -205,7 +205,10 @@
 
   /* ---------- 빠른 패널 ---------- */
   #quick { position: fixed; right: 20px; bottom: 20px; width: 340px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid #dadce0; border-radius: 12px; box-shadow: 0 6px 24px rgba(60,64,67,.25); padding: 12px; z-index: 40; font-size: 13px; color: #3c4043; }
-  #quick .q-head { display: flex; justify-content: space-between; color: #5f6368; margin-bottom: 6px; }
+  #quick { display: flex; flex-direction: column; }
+  #quick .q-head { display: flex; justify-content: space-between; color: #5f6368; margin-bottom: 6px; cursor: move; user-select: none; touch-action: none; }
+  #quick .q-resize { position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none; border-right: 2px solid #c4c7c5; border-bottom: 2px solid #c4c7c5; border-radius: 0 0 8px 0; }
+  #quick.sized ul { max-height: none; flex: 1 1 auto; min-height: 0; }
   #quick input[type=text] { width: 100%; border: 1px solid #dadce0; border-radius: 6px; padding: 8px 10px; outline: none; }
   #quick input[type=text]:focus { border-color: #1a73e8; }
   #quick ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 220px; overflow: auto; }
@@ -298,7 +301,8 @@
 
 <!-- 빠른 패널 (Ctrl+J) -->
 <div id="quick" hidden>
-  <div class="q-head"><span>메모</span><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div>
+  <div class="q-resize" title="크기 조절"></div>
+  <div class="q-head" title="끌어서 옮기기 · 두 번 누르면 원래 자리로"><span>메모</span><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div>
   <input type="text" id="q-input" autocomplete="off" spellcheck="false">
   <ul id="q-results"></ul>
   <div class="q-now" id="q-now" hidden>
@@ -882,11 +886,62 @@ function onKindChange() {
   Q.auto = []; Q.autoEpoch++;
   refillAuto(); renderQueue();
 }
+// 빠른 패널: 위쪽 줄을 끌어 옮기고 오른쪽 아래 모서리로 크기 조절. 위치·크기는 store.settings.quickBox에 기억
+const quickEl = $('#quick'), QUICK_MIN = { w: 260, h: 200 };
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function placeQuick() {
+  const b = store.settings.quickBox, st = quickEl.style;
+  quickEl.classList.toggle('sized', !!(b && b.h));
+  if (!b) { st.left = st.top = st.width = st.height = st.right = st.bottom = ''; return; }
+  st.width = clamp(b.w, QUICK_MIN.w, innerWidth) + 'px';
+  st.height = b.h ? clamp(b.h, QUICK_MIN.h, innerHeight) + 'px' : '';
+  const r = quickEl.getBoundingClientRect();
+  st.right = st.bottom = 'auto';
+  st.left = clamp(b.x, 0, innerWidth - r.width) + 'px';
+  st.top = clamp(b.y, 0, innerHeight - r.height) + 'px';
+}
+function saveQuickBox() {
+  const r = quickEl.getBoundingClientRect();
+  store.settings.quickBox = { x: r.left, y: r.top, w: r.width, h: quickEl.classList.contains('sized') ? r.height : 0 };
+  save();
+}
+function quickPointer(e, onMove) {
+  e.preventDefault();
+  const r = quickEl.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, st = quickEl.style;
+  st.right = st.bottom = 'auto'; st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px';
+  const move = ev => onMove(ev.clientX - sx, ev.clientY - sy, r);
+  const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); saveQuickBox(); };
+  addEventListener('pointermove', move); addEventListener('pointerup', up);
+}
+$('#quick .q-head').addEventListener('pointerdown', e => {
+  if (e.target.closest('button') || e.button !== 0) return;
+  quickPointer(e, (dx, dy, r) => {
+    quickEl.style.left = clamp(r.left + dx, 0, innerWidth - r.width) + 'px';
+    quickEl.style.top = clamp(r.top + dy, 0, innerHeight - r.height) + 'px';
+  });
+});
+$('#quick .q-resize').addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  quickPointer(e, (dx, dy, r) => {
+    // 커질 자리가 없으면 패널을 위·왼쪽으로 밀어 화면 안에 둔다 (손잡이가 화면 밖으로 나가지 않게)
+    const w = clamp(r.width + dx, QUICK_MIN.w, innerWidth), h = clamp(r.height + dy, QUICK_MIN.h, innerHeight);
+    quickEl.classList.add('sized');
+    quickEl.style.width = w + 'px'; quickEl.style.height = h + 'px';
+    quickEl.style.left = clamp(r.left, 0, innerWidth - w) + 'px';
+    quickEl.style.top = clamp(r.top, 0, innerHeight - h) + 'px';
+  });
+});
+$('#quick .q-head').addEventListener('dblclick', e => {
+  if (e.target.closest('button')) return;
+  delete store.settings.quickBox; save(); placeQuick();
+});
+addEventListener('resize', () => { if (quickOpen) placeQuick(); });
 function toggleQuick(force) {
   quickOpen = force ?? !quickOpen;
   $('#quick').hidden = !quickOpen;
   if (quickOpen) {
     if (mode === 'music') setMode('doc');
+    placeQuick();
     renderQuickNow();
     setTimeout(() => $('#q-input').focus(), 0);
   }
@@ -1029,7 +1084,8 @@ function renderMain() {
         <p class="m-hint">좋아요·플레이리스트는 이 브라우저에만 저장돼요. 다른 PC로 옮길 때 파일로 내보내고 가져오세요.</p>
         <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="margin:0;cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label></div>
         <h3>단축키</h3>
-        <p class="m-hint">Alt+M 음악 화면 · Ctrl+J 빠른 패널 · Ctrl+X 또는 Alt+K 긴급 탈출 · [ 어디서나 재생/정지 · Esc 문서로 · Space 재생/정지 · V 영상</p>
+        <p class="m-hint">Alt+M 음악 화면 · Ctrl+J 빠른 패널 · Ctrl+X 또는 Alt+K 긴급 탈출 · [ 어디서나 재생/정지 · Alt+. 다음 곡 · Alt+, 이전 곡 · Alt+L 좋아요 · Alt+X 싫어요 · Esc 문서로 · Space 재생/정지 · V 영상</p>
+        <p class="m-hint">문서: Ctrl+Shift+C 글자 수 · Ctrl+Shift+&gt; / &lt; 글자 크기 · 빠른 패널은 위쪽 줄을 끌어 옮기고 오른쪽 아래 모서리로 크기 조절 (두 번 누르면 원래 자리)</p>
       </div>`;
   }
   placePlayer();
@@ -1195,6 +1251,20 @@ async function downloadTrack(t, fmt) {
   } catch (e) { toast(DL_OFF); }
 }
 
+// 다음 곡 버튼·Alt+. : 처음 30초 안에 넘기면 skip으로 센다
+function skipNext() { if (!Q.waiting) noteSkip(); next(false); }
+// 지금 곡 싫어요 (⊖ 버튼·Alt+X)
+function dislikeCurrent() {
+  const t = current();
+  if (!t) return;
+  // 이미 싫어요면 해제. 단 넘길 추천을 기다리는 중에 또 누른 건 무시
+  if (isDisliked(t.id)) { if (!Q.waiting) toggleDislike(t); return; }
+  toggleDislike(t);
+  // 넘길 곡이 없으면 처음(=이 곡)으로 돌아가지 않고 멈춘다
+  if (Q.i + 1 < Q.list.length || useAuto() || (store.repeat === 'all' && Q.list.length > 1)) next(false, true);
+  else pause();
+}
+
 // ---------- 라이브러리 조작 ----------
 function toggleLike(t, k = kind()) {
   const B = bucket(k);
@@ -1272,17 +1342,7 @@ document.addEventListener('click', e => {
     case 'm-dl': downloadTrack(menuTrack, el.dataset.fmt); hideMenu(); break;
     case 'dlcur': if (current()) showDlMenu(el); break;
     case 'qdl': showDlMenu(el, lists.quick[i]); break;
-    case 'dislikecur': {
-      const t = current();
-      if (!t) break;
-      // 이미 싫어요면 해제. 단 넘길 추천을 기다리는 중에 또 누른 건 무시
-      if (isDisliked(t.id)) { if (!Q.waiting) toggleDislike(t); break; }
-      toggleDislike(t);
-      // 넘길 곡이 없으면 처음(=이 곡)으로 돌아가지 않고 멈춘다
-      if (Q.i + 1 < Q.list.length || useAuto() || (store.repeat === 'all' && Q.list.length > 1)) next(false, true);
-      else pause();
-      break;
-    }
+    case 'dislikecur': dislikeCurrent(); break;
     case 'undislike': { const k = el.dataset.kind; toggleDislike(bucket(k).disliked[i].t, k); break; }
     case 'm-addpl': addToPlaylist(plById(el.dataset.id), menuTrack); hideMenu(); break;
     case 'm-newpl': { const p = newPlaylist(menuTrack); hideMenu(); toast(`'${p.name}'을 만들었어요`); renderAll(); break; }
@@ -1302,7 +1362,7 @@ document.addEventListener('click', e => {
     case 'unqueue': Q.list.splice(i, 1); if (i < Q.i) Q.i--; renderQueue(); break;
     case 'toggle': togglePlay(); break;
     case 'prev': prev(); break;
-    case 'next': if (!Q.waiting) noteSkip(); next(false); break;
+    case 'next': skipNext(); break;
     case 'back10': seekBy(-10); break;
     case 'fwd10': seekBy(10); break;
     case 'voldown': setVolume(store.volume - 10); toast(`볼륨 ${store.volume}`); break;
@@ -1397,6 +1457,13 @@ window.addEventListener('keydown', e => {
   if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.code === 'KeyX') { e.preventDefault(); panic(); return; }
   // [ 는 문서·음악 화면 어디서든 재생/정지 (검색창·제목 같은 입력칸에서는 그대로 입력)
   if (e.code === 'BracketLeft' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); togglePlay(); return; }
+  // 음악 단축키 (문서에 쓰는 중에도): Alt+. 다음 곡, Alt+, 이전 곡, Alt+L 좋아요, Alt+X 싫어요
+  if (e.altKey && !e.ctrlKey && !e.metaKey) {
+    if (e.code === 'Period') { e.preventDefault(); skipNext(); return; }
+    if (e.code === 'Comma') { e.preventDefault(); prev(); return; }
+    if (e.code === 'KeyL') { e.preventDefault(); const t = current(); if (t) { toggleLike(t); toast(isLiked(t.id) ? '좋아요에 추가했어요' : '좋아요를 취소했어요'); } return; }
+    if (e.code === 'KeyX') { e.preventDefault(); dislikeCurrent(); return; }
+  }
   // 문서 단축키: Ctrl+Shift+C 글자 수, Ctrl+Shift+> / < 글자 크기
   if (mode === 'doc' && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey) {
     if (e.code === 'KeyC') { e.preventDefault(); showCount(); return; }
