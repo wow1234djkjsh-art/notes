@@ -184,6 +184,18 @@
   .pill { border: 1px solid #555; border-radius: 16px; padding: 6px 14px; font-size: 13px; color: #ddd; }
   .pill:hover { border-color: #fff; color: #fff; }
   .pill.danger { border-color: #a33; color: #f88; }
+  .dl-badge { margin-left: auto; min-width: 18px; padding: 0 6px; border-radius: 9px; background: #1ed760; color: #000; font-size: 11px; font-weight: 700; text-align: center; }
+  .dl-list { margin-top: 12px; }
+  .dl-row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 6px; }
+  .dl-row:hover { background: #1f1f1f; }
+  .dl-row img { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; flex: none; }
+  .dl-txt { flex: 1; min-width: 0; }
+  .dl-txt div { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dl-txt small { color: #8a8a8a; }
+  .dl-st.done { color: #1ed760; }
+  .dl-st.error { color: #f88; }
+  .dl-bar { height: 3px; margin-top: 6px; border-radius: 2px; background: #333; overflow: hidden; }
+  .dl-bar i { display: block; height: 100%; background: #1ed760; transition: width .5s; }
   .trk { display: grid; grid-template-columns: 28px 44px minmax(0, 1fr) 56px 30px 30px; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 6px; color: #b3b3b3; font-size: 14px; cursor: pointer; }
   .trk:hover { background: #2a2a2a; }
   .trk.cur { color: #ff8a65; }
@@ -306,6 +318,7 @@
     <div class="m-nav">
       <button data-act="go" data-route="home"><svg class="mi" aria-hidden="true"><use href="#m-home"/></svg> 홈</button>
       <button data-act="go" data-route="search"><svg class="mi" aria-hidden="true"><use href="#m-search"/></svg> 검색</button>
+      <button data-act="go" data-route="downloads"><svg class="mi" aria-hidden="true"><use href="#m-download"/></svg> 다운로드</button>
     </div>
     <div class="m-label"><span>내 라이브러리</span><button data-act="newpl" title="새 플레이리스트"><svg class="mi" aria-hidden="true"><use href="#m-add"/></svg></button></div>
     <div class="m-lib" id="lib"></div>
@@ -581,6 +594,8 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 2일', [
+    '다운로드 탭: 음악 화면 왼쪽 "다운로드"에서 곡마다 대기 중 / 받는 중 / 변환 중(남은 시간) / 저장됨이 따로 보임. 실패하면 "다시" 버튼',
+    'MP4 변환이 2~3배 빨라짐',
     '검색 고침: 글자 수가 같은 한글 검색어(예: 이도원·아이유)끼리 결과가 섞여 나오던 문제',
     '친구 채팅: 문서 오른쪽 위 댓글 아이콘을 누르면 댓글 창처럼 생긴 대화창이 열림. 친구가 접속해 있으면 "나" 옆에 동그라미가 보이고, 새 글이 오면 아이콘에 작은 점',
     '처음 들어온 사람에게 단축키와 업데이트 내역을 한 번 보여 줌',
@@ -1160,6 +1175,19 @@ function renderMain() {
     el.innerHTML = `
       <div id="video-slot">${t ? '' : '재생 중인 곡이 없어요'}</div>
       ${t ? `<h2 style="margin-top:16px">${esc(t.title)}</h2><p class="m-hint">${esc(t.channel)} · V 또는 영상 버튼으로 닫기</p>` : ''}`;
+  } else if (r.name === 'downloads') {
+    const done = downloads.some(d => !dlBusy(d));
+    el.innerHTML = `
+      <h2>다운로드</h2>
+      <p class="m-hint">이 컴퓨터에서 MP3·MP4로 바꿔 다운로드 폴더에 저장해요. 한 번에 하나씩 차례로 만들고, 이 탭을 닫으면 받던 것도 끊겨요.</p>
+      ${done ? '<div class="actions"><button class="pill" data-act="dl-clear">끝난 것 지우기</button></div>' : ''}
+      ${downloads.length ? `<div class="dl-list">${downloads.map((d, i) => `
+        <div class="dl-row">
+          <img src="${thumb(d.t.id)}" alt="">
+          <div class="dl-txt"><div>${esc(d.t.title)}</div><small>${d.fmt.toUpperCase()} · <span class="dl-st ${d.state}">${esc(dlStatus(d, i))}</span></small>
+            ${d.state === 'working' ? `<div class="dl-bar"><i style="width:${d.progress}%"></i></div>` : ''}</div>
+          ${d.state === 'error' ? `<button class="pill" data-act="dl-retry" data-key="${d.key}">다시</button>` : ''}
+        </div>`).reverse().join('')}</div>` : '<p class="m-hint">받은 곡이 없어요. 곡의 더보기 메뉴나 재생 바의 받기 버튼으로 받을 수 있어요.</p>'}`;
   } else if (r.name === 'disliked') {
     el.innerHTML = `
       <h2>싫어요 표시한 곡</h2>
@@ -1324,33 +1352,75 @@ function fileNameOf(cd) {
   const plain = /filename="([^"]+)"/i.exec(cd || '');
   return plain ? plain[1] : '';
 }
-async function downloadTrack(t, fmt) {
+// 이 탭에서 받은 것들(오래된 것부터). 탭을 닫으면 받던 것도 끊기니 저장하지 않는다
+const downloads = [];
+let dlSeq = 0;
+const dlBusy = d => d.state === 'queued' || d.state === 'working' || d.state === 'saving';
+function dlChanged() {
+  const b = $('.m-nav [data-route="downloads"]'), n = downloads.filter(dlBusy).length;
+  b.querySelector('.dl-badge')?.remove();
+  if (n) b.insertAdjacentHTML('beforeend', `<span class="dl-badge">${n}</span>`);
+  if (mode === 'music' && route.name === 'downloads') renderMain();
+}
+// 변환 단계(50% 이후)에 처음 본 때부터의 속도로 남은 시간을 어림한다
+function dlEta(d) {
+  if (!d.c0 || d.progress <= d.c0.p || d.pt - d.c0.t < 3000) return '';
+  const sec = (100 - d.progress) * (d.pt - d.c0.t) / (d.progress - d.c0.p) / 1000;
+  return sec < 60 ? ' · 곧 끝나요' : ` · 약 ${Math.round(sec / 60)}분 남음`;
+}
+function dlStatus(d, i) {
+  if (d.state === 'queued') {
+    const ahead = downloads.slice(0, i).filter(x => x.state === 'queued' || x.state === 'working').length;
+    return ahead ? `대기 중 (앞에 ${ahead}개)` : '대기 중';
+  }
+  if (d.state === 'working') return d.progress < 50 ? `받는 중 ${d.progress}%` : `변환 중 ${d.progress}%${dlEta(d)}`;
+  if (d.state === 'saving') return '저장하는 중';
+  if (d.state === 'done') return '저장됨';
+  return '실패: ' + d.error;
+}
+function dlFail(d, why, msg = '받지 못했어요: ' + why) {
+  d.state = 'error'; d.error = why;
+  dlChanged(); toast(msg);
+}
+async function downloadTrack(t, fmt, d = { key: ++dlSeq, t, fmt }) {
   const base = setting('dlUrl'), label = fmt.toUpperCase();
+  Object.assign(d, { state: 'queued', progress: 0, error: '', c0: null, pt: 0 });
+  const at = downloads.indexOf(d);
+  if (at >= 0) downloads.splice(at, 1);
+  downloads.push(d);
+  dlChanged();
   let job;
   try {
     const r = await fetch(base + '/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, fmt }) });
     if (!r.ok) throw new Error(r.status);
     job = (await r.json()).job;
-  } catch (e) { return toast(DL_OFF); }
-  toast(`${label} 만드는 중… 0%`);
+  } catch (e) { return dlFail(d, '다운로드 서버가 꺼져 있어요', DL_OFF); }
+  toast(`${label} 받기 시작 (진행 상황은 다운로드 탭에)`);
   try {
     for (;;) {
       await new Promise(r => setTimeout(r, 1000));
       const res = await fetch(`${base}/jobs/${job}`);
       // 서버가 다시 켜지면 작업이 사라진다: 계속 기다리지 않고 알려 준다
-      if (res.status === 404) return toast('받지 못했어요: 다운로드 서버가 다시 켜졌어요. 한 번 더 눌러 주세요');
+      if (res.status === 404) return dlFail(d, '다운로드 서버가 다시 켜졌어요', '받지 못했어요: 다운로드 서버가 다시 켜졌어요. 한 번 더 눌러 주세요');
       const st = await res.json();
-      if (st.state === 'error') return toast(`받지 못했어요: ${st.error || ''}`);
+      if (st.state === 'error') return dlFail(d, st.error || '');
       if (st.state === 'done') break;
-      toast(`${label} 만드는 중… ${st.progress || 0}%`);
+      const p = st.progress || 0;
+      if (st.state === d.state && p === d.progress) continue;
+      if (p !== d.progress) d.pt = Date.now();
+      if (p >= 50 && !d.c0) d.c0 = { t: d.pt, p };
+      d.state = st.state; d.progress = p;
+      dlChanged();
     }
+    d.state = 'saving'; dlChanged();
     const r = await fetch(`${base}/jobs/${job}/file`);
     if (!r.ok) throw new Error(r.status);
     const u = URL.createObjectURL(await r.blob()), link = document.createElement('a');
     link.href = u; link.download = fileNameOf(r.headers.get('Content-Disposition')) || `${t.title}.${fmt}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(u), 10000);
+    d.state = 'done'; dlChanged();
     toast('다운로드 폴더에 저장했어요');
-  } catch (e) { toast(DL_OFF); }
+  } catch (e) { dlFail(d, '다운로드 서버가 꺼져 있어요', DL_OFF); }
 }
 
 // 다음 곡 버튼·Alt+. : 처음 30초 안에 넘기면 skip으로 센다
@@ -1428,6 +1498,8 @@ document.addEventListener('click', e => {
   const a = el.dataset.act, key = el.dataset.list, i = +el.dataset.i;
   switch (a) {
     case 'go': go({ name: el.dataset.route, id: el.dataset.id }); break;
+    case 'dl-retry': { const d = downloads.find(x => x.key === +el.dataset.key); if (d) downloadTrack(d.t, d.fmt, d); break; }
+    case 'dl-clear': downloads.splice(0, downloads.length, ...downloads.filter(dlBusy)); renderMain(); break;
     case 'play':
       if ((key === 'search' || key === 'quick') && autoplayOn()) setQueue([lists[key][i]], 0, 'search');
       else setQueue(lists[key], i);
