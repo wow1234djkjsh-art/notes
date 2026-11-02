@@ -63,8 +63,14 @@
   #d-pop .d-swatches { display: grid; grid-template-columns: repeat(10, 20px); gap: 4px; padding: 6px 12px; }
   #d-pop .d-sw { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #dadce0; cursor: pointer; font-size: 0; }
   #d-pop .d-none { padding: 6px 12px; cursor: pointer; }
-  #d-count { position: fixed; inset: 0; z-index: 80; background: rgba(32,33,36,.6); display: grid; place-items: center; }
-  #d-count[hidden] { display: none; }
+  #d-count, #d-keys { position: fixed; inset: 0; z-index: 80; background: rgba(32,33,36,.6); display: grid; place-items: center; }
+  #d-count[hidden], #d-keys[hidden] { display: none; }
+  .d-keys { width: min(560px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; }
+  .d-keys h4 { margin: 18px 0 6px; font-size: 14px; color: #1f1f1f; text-align: left; }
+  .d-keys th { padding: 0; }
+  .d-keys td:first-child { white-space: nowrap; padding-right: 16px; width: 1%; }
+  .d-dialog.d-keys td + td { text-align: left; color: #3c4043; }
+  .d-keys kbd { font: 12px/1 Roboto Mono, Consolas, monospace; background: #f1f3f4; border: 1px solid #dadce0; border-radius: 4px; padding: 3px 6px; }
   .d-dialog { background: #fff; border-radius: 8px; padding: 24px; min-width: 300px; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
   .d-dialog h3 { margin: 0 0 16px; font-weight: 400; font-size: 22px; }
   .d-dialog table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -74,7 +80,7 @@
   .d-dialog-btns button { background: #0b57d0; color: #fff; border-radius: 18px; padding: 8px 20px; font-size: 14px; }
   @media print {
     html, body { height: auto; overflow: visible; background: #fff; }
-    #music, #quick, #yt-wrap, #menu, #toast, #d-pop, #d-count, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
+    #music, #quick, #yt-wrap, #menu, #toast, #d-pop, #d-count, #d-keys, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
     #doc, .d-canvas { display: block; height: auto; overflow: visible; background: #fff; }
     .d-pages { padding: 0; }
     .d-page { box-shadow: none; margin: 0; padding: 0; width: auto; max-width: none; min-height: 0; zoom: 1 !important; }
@@ -248,7 +254,7 @@
     <svg class="d-icon" viewBox="0 0 30 40"><path d="M20 0H3a3 3 0 0 0-3 3v34a3 3 0 0 0 3 3h24a3 3 0 0 0 3-3V10z" fill="#4285f4"/><path d="M20 0v7a3 3 0 0 0 3 3h7z" fill="#a1c2fa"/><path d="M7 18h16v2.4H7zm0 5h16v2.4H7zm0 5h16v2.4H7zm0 5h10v2.4H7z" fill="#fff"/></svg>
     <div class="d-head">
       <div class="d-titlerow"><input id="doc-title" class="d-title" spellcheck="false"><span class="d-ib" title="별표"><svg class="ic s"><use href="#i-star"/></svg></span><span class="d-ib d-hide-s" title="이동"><svg class="ic s"><use href="#i-move"/></svg></span><span class="d-ib d-hide-s" title="문서 상태"><svg class="ic s"><use href="#i-cloud"/></svg></span><span class="d-meta" id="doc-saved">모든 변경사항이 저장됨</span></div>
-      <div class="d-menu"><span data-menu="file">파일</span><span>수정</span><span>보기</span><span>삽입</span><span>서식</span><span>도구</span><span>확장 프로그램</span><span>도움말</span></div>
+      <div class="d-menu"><span data-menu="file">파일</span><span>수정</span><span>보기</span><span>삽입</span><span>서식</span><span>도구</span><span>확장 프로그램</span><span data-menu="help">도움말</span></div>
     </div>
     <div class="d-right">
       <span class="d-rb d-hide-s" title="최근 변경사항 보기"><svg class="ic"><use href="#i-history"/></svg></span>
@@ -318,6 +324,7 @@
 <div id="menu" hidden></div>
 <div id="d-pop" hidden></div>
 <div id="d-count" hidden><div class="d-dialog"><h3>글자 수</h3><table><tr><td>단어</td><td data-count="words"></td></tr><tr><td>문자</td><td data-count="chars"></td></tr><tr><td>공백 제외 문자</td><td data-count="nospace"></td></tr></table><div class="d-dialog-btns"><button data-doc="countclose">확인</button></div></div></div>
+<div id="d-keys" hidden><div class="d-dialog d-keys"><h3>단축키</h3><div class="d-keys-body"></div><div class="d-dialog-btns"><button data-doc="keysclose">닫기</button></div></div></div>
 <div id="toast" hidden></div>
 
 <script>
@@ -494,6 +501,7 @@ function showPop(kind, anchor) {
     color: () => swatches(false),
     hilite: () => swatches(true),
     file: () => item('txt', '다운로드 (.txt)'),
+    help: () => item('keys', '단축키 (Ctrl+/)'),
   }[kind]();
   dPop.hidden = false;
   const r = anchor.getBoundingClientRect();
@@ -504,6 +512,7 @@ const hidePop = () => { dPop.hidden = true; popKind = ''; };
 function applyPop(kind, v) {
   if (kind === 'zoom') { applyZoom(+v); store.settings.docZoom = +v; save(); return; }
   if (kind === 'file') return downloadDoc();
+  if (kind === 'help') return showKeys();
   if (kind === 'size') return applySize(+v);
   if (kind === 'spacing') return applyLineHeight(v);
   restoreRange();
@@ -519,6 +528,20 @@ function downloadDoc() {
   const blob = new Blob([title + '\n\n' + docPage.innerText], { type: 'text/plain;charset=utf-8' });
   const u = URL.createObjectURL(blob), link = document.createElement('a');
   link.href = u; link.download = title.replace(/[\\/:*?"<>|]/g, '_') + '.txt'; link.click(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+// 단축키 목록 (Ctrl+/, 도움말 메뉴, 설정)
+const SHORTCUTS = [
+  ['음악 (문서에 쓰는 중에도)', [['[', '재생 / 일시정지 (입력칸 제외)'], ['Alt+.', '다음 곡'], ['Alt+,', '이전 곡'], ['Alt+L', '좋아요'], ['Alt+X', '싫어요 (바로 다음 곡으로)']]],
+  ['화면', [['Alt+M', '음악 화면과 문서 화면 전환'], ['Ctrl+J', '빠른 패널 열기 / 닫기'], ['Ctrl+X 또는 Alt+K', '긴급 탈출 (진짜 Google 문서로 이동)'], ['Esc', '메뉴·패널 닫기, 음악 화면에서는 문서로']]],
+  ['음악 화면', [['Space', '재생 / 일시정지'], ['V', '영상 보기 / 닫기']]],
+  ['문서', [['Ctrl+B / Ctrl+I / Ctrl+U', '굵게 / 기울임 / 밑줄'], ['Ctrl+Z / Ctrl+Y', '실행취소 / 재실행'], ['Ctrl+Shift+> / Ctrl+Shift+<', '글자 크기 1pt 크게 / 작게'], ['Ctrl+Shift+C', '글자 수'], ['Ctrl+P', '인쇄 (문서만)'], ['Ctrl+/', '이 단축키 목록']]],
+  ['빠른 패널', [['위쪽 줄 끌기', '옮기기'], ['오른쪽 아래 모서리 끌기', '크기 조절'], ['위쪽 줄 두 번 누르기', '원래 자리로'], ['검색창에서 Enter', '검색']]],
+];
+function showKeys() {
+  hidePop();
+  $('#d-keys .d-keys-body').innerHTML = '<table>' + SHORTCUTS.map(([h, rows]) => `<tr><th colspan="2"><h4>${esc(h)}</h4></th></tr>${rows.map(([k, d]) =>
+    `<tr><td>${k.split(' / ').map(x => x.split(' 또는 ').map(y => /^[A-Za-z\[]|^Ctrl|^Alt|^Esc|^Space/.test(y) ? `<kbd>${esc(y)}</kbd>` : esc(y)).join(' 또는 ')).join(' / ')}</td><td>${esc(d)}</td></tr>`).join('')}`).join('') + '</table>';
+  $('#d-keys').hidden = false;
 }
 function showCount() {
   const text = docPage.innerText.replace(/\n/g, '');
@@ -545,6 +568,8 @@ document.addEventListener('click', e => {
   if (!d) return;
   if (d.dataset.doc === 'print') window.print();
   if (d.dataset.doc === 'countclose') $('#d-count').hidden = true;
+  if (d.dataset.doc === 'keys') showKeys();
+  if (d.dataset.doc === 'keysclose') $('#d-keys').hidden = true;
 });
 sizeIn.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); hidePop(); applySize(+sizeIn.value); }
@@ -1084,8 +1109,7 @@ function renderMain() {
         <p class="m-hint">좋아요·플레이리스트는 이 브라우저에만 저장돼요. 다른 PC로 옮길 때 파일로 내보내고 가져오세요.</p>
         <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="margin:0;cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label></div>
         <h3>단축키</h3>
-        <p class="m-hint">Alt+M 음악 화면 · Ctrl+J 빠른 패널 · Ctrl+X 또는 Alt+K 긴급 탈출 · [ 어디서나 재생/정지 · Alt+. 다음 곡 · Alt+, 이전 곡 · Alt+L 좋아요 · Alt+X 싫어요 · Esc 문서로 · Space 재생/정지 · V 영상</p>
-        <p class="m-hint">문서: Ctrl+Shift+C 글자 수 · Ctrl+Shift+&gt; / &lt; 글자 크기 · 빠른 패널은 위쪽 줄을 끌어 옮기고 오른쪽 아래 모서리로 크기 조절 (두 번 누르면 원래 자리)</p>
+        <button class="pill" data-doc="keys">단축키 보기 (Ctrl+/)</button>
       </div>`;
   }
   placePlayer();
@@ -1457,6 +1481,7 @@ window.addEventListener('keydown', e => {
   if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.code === 'KeyX') { e.preventDefault(); panic(); return; }
   // [ 는 문서·음악 화면 어디서든 재생/정지 (검색창·제목 같은 입력칸에서는 그대로 입력)
   if (e.code === 'BracketLeft' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); togglePlay(); return; }
+  if (e.ctrlKey && !e.altKey && !e.metaKey && e.code === 'Slash') { e.preventDefault(); $('#d-keys').hidden ? showKeys() : ($('#d-keys').hidden = true); return; }
   // 음악 단축키 (문서에 쓰는 중에도): Alt+. 다음 곡, Alt+, 이전 곡, Alt+L 좋아요, Alt+X 싫어요
   if (e.altKey && !e.ctrlKey && !e.metaKey) {
     if (e.code === 'Period') { e.preventDefault(); skipNext(); return; }
@@ -1471,6 +1496,7 @@ window.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape') {
     if (!$('#d-count').hidden) { $('#d-count').hidden = true; return; }
+    if (!$('#d-keys').hidden) { $('#d-keys').hidden = true; return; }
     if (!dPop.hidden) { hidePop(); return; }
     if (!$('#menu').hidden) hideMenu();
     else if (quickOpen) toggleQuick(false);
