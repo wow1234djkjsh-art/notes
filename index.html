@@ -405,7 +405,7 @@ function setQueue(list, i, source = 'list') {
 function playCurrent() {
   const t = current();
   if (!t) return;
-  counted = false;
+  counted = false; loopPlays = 0;
   if (playerReady) player.loadVideoById(t.id); else pendingId = t.id;
   const B = bucket();
   B.recent = [slim(t), ...B.recent.filter(x => x.id !== t.id)].slice(0, 30);
@@ -416,7 +416,11 @@ function playCurrent() {
 // fromError: 재생 오류로 넘어가는 중이면 추천이 없을 때 처음(=고장 난 곡)으로 돌아가지 않고 멈춘다
 function next(auto, fromError) {
   if (!Q.list.length) return;
-  if (auto && store.repeat === 'one') { player.seekTo(0, true); player.playVideo(); return; }
+  if (auto && store.repeat === 'one') {
+    // 한 곡 반복으로 끝까지 들으면 1번 더 친다 (한 번 틀었을 때 최대 LOOP_PLAYS번)
+    if (counted && loopPlays < LOOP_PLAYS) { counted = false; loopPlays++; }
+    player.seekTo(0, true); player.playVideo(); return;
+  }
   if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); }
   if (useAuto()) {
     if (takeAuto()) return playCurrent();
@@ -439,7 +443,8 @@ function endOfList(auto) {
   if (store.repeat === 'all' || !auto) { Q.i = 0; playCurrent(); } else renderAll();
 }
 // 재생 기록: 30초 이상 또는 절반 이상 들으면 곡당 한 번 plays, 처음 30초 안에 다음 버튼이면 skips
-let counted = false;
+let counted = false, loopPlays = 0;
+const LOOP_PLAYS = 3;
 const STATS_MAX = 500;
 function statFor(t) {
   const stats = bucket().stats;
@@ -490,7 +495,7 @@ function setVolume(v) {
 // ---------- 자동 추천 (순수 함수) ----------
 // @@autoplay-pure-start
 // mine: 내 기록, mix: 지금 곡의 YouTube 믹스, taste: 내 취향 곡의 믹스, popular: 인기 음악
-const AUTO_WEIGHTS = { mine: 45, mix: 35, taste: 15, popular: 5 };
+const AUTO_WEIGHTS = { mine: 50, mix: 30, taste: 15, popular: 5 };
 // 싫어요: 아예 막지 않고 덜 나오게. 그 곡 자체, 같은 채널, 그 곡 YouTube 믹스에 있던 곡 (해당되면 곱해짐)
 const DISLIKE = { self: 0.1, artist: 0.5, similar: 0.8 };
 // 링크로 붙여 넣은 곡의 채널 자리 (가수가 아니므로 같은 가수 감점에서 뺀다)
