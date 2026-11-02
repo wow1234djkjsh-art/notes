@@ -55,6 +55,30 @@
   .d-size input { font: inherit; border: 1px solid #747775; border-radius: 4px; width: 34px; height: 24px; text-align: center; margin: 0 2px; color: #1f1f1f; background: transparent; padding: 0; }
   .d-size input:focus { outline: 2px solid #0b57d0; outline-offset: -1px; }
   .d-tb.on { background: #d3e3fd; }
+  .d-chatbtn { position: relative; color: inherit; }
+  .d-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: #0b57d0; }
+  #d-people { display: flex; }
+  #d-people .d-avatar { margin-left: -6px; border: 2px solid #f9fbfd; box-sizing: content-box; }
+  #d-chat { position: fixed; right: 16px; top: 112px; bottom: 16px; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15); z-index: 45; display: flex; flex-direction: column; font-size: 14px; color: #1f1f1f; }
+  .dc-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 10px 16px; font-size: 16px; border-bottom: 1px solid #e3e3e3; }
+  .dc-head button { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: #444746; }
+  .dc-head button:hover { background: rgba(68,71,70,.08); }
+  .dc-list { flex: 1; overflow: auto; padding: 4px 12px; }
+  .dc-msg { background: #f8fafd; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .dc-who { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .dc-av { width: 28px; height: 28px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-size: 13px; flex: none; }
+  .dc-name b { font-weight: 500; }
+  .dc-time { color: #5f6368; font-size: 12px; }
+  .dc-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .dc-empty { color: #5f6368; text-align: center; margin: 24px 0; }
+  .dc-note { color: #b3261e; font-size: 13px; margin: 0; padding: 0 16px; }
+  .dc-note:empty { display: none; }
+  .dc-form, form.dc-name { border-top: 1px solid #e3e3e3; padding: 12px; }
+  form.dc-name label { display: block; margin-bottom: 6px; color: #444746; }
+  .dc-form textarea, form.dc-name input { width: 100%; box-sizing: border-box; border: 1px solid #747775; border-radius: 4px; padding: 8px 10px; font: inherit; resize: none; outline: none; }
+  .dc-form textarea:focus, form.dc-name input:focus { border-color: #0b57d0; box-shadow: inset 0 0 0 1px #0b57d0; }
+  .dc-btns { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .dc-send { background: #0b57d0; color: #fff; border-radius: 18px; padding: 6px 16px; font-size: 14px; }
   .d-font .lbl { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #d-pop { position: fixed; z-index: 70; background: #fff; border-radius: 4px; box-shadow: 0 2px 6px 2px rgba(60,64,67,.15), 0 1px 2px rgba(60,64,67,.3); padding: 6px 0; font-size: 14px; color: #1f1f1f; max-height: 70vh; overflow: auto; min-width: 140px; }
   #d-pop .d-pi { padding: 6px 16px; cursor: pointer; white-space: nowrap; }
@@ -84,7 +108,7 @@
   .d-dialog-btns button { background: #0b57d0; color: #fff; border-radius: 18px; padding: 8px 20px; font-size: 14px; }
   @media print {
     html, body { height: auto; overflow: visible; background: #fff; }
-    #music, #quick, #yt-wrap, #menu, #toast, #d-pop, #d-count, #d-keys, #d-log, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
+    #music, #quick, #yt-wrap, #menu, #toast, #d-pop, #d-count, #d-keys, #d-log, #d-chat, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
     #doc, .d-canvas { display: block; height: auto; overflow: visible; background: #fff; }
     .d-pages { padding: 0; }
     .d-page { box-shadow: none; margin: 0; padding: 0; width: auto; max-width: none; min-height: 0; zoom: 1 !important; }
@@ -262,10 +286,10 @@
     </div>
     <div class="d-right">
       <span class="d-rb d-hide-s" title="최근 변경사항 보기"><svg class="ic"><use href="#i-history"/></svg></span>
-      <span class="d-rb d-hide-s" title="댓글 기록 열기"><svg class="ic"><use href="#i-comment"/></svg></span>
+      <button class="d-rb d-chatbtn" data-doc="chat" title="댓글 기록 열기"><svg class="ic"><use href="#i-comment"/></svg><i class="d-dot" hidden></i></button>
       <span class="d-meet" title="회의에 참여하거나 이 탭을 바로 공유"><svg class="ic"><use href="#i-video"/></svg><svg class="ic s"><use href="#i-drop"/></svg></span>
       <span class="d-share"><svg class="ic s"><use href="#i-lock"/></svg>공유</span>
-      <span class="d-avatar">나</span>
+      <span id="d-people"></span><span class="d-avatar">나</span>
     </div>
   </div>
   <div class="d-tools"><span class="d-tb d-search" title="메뉴 검색 (Alt+/)"><svg class="ic"><use href="#i-search"/></svg><span>메뉴 검색</span></span><button class="d-tb" data-cmd="undo" title="실행취소 (Ctrl+Z)"><svg class="ic"><use href="#i-undo"/></svg></button><button class="d-tb" data-cmd="redo" title="재실행 (Ctrl+Y)"><svg class="ic"><use href="#i-redo"/></svg></button><button class="d-tb" data-doc="print" title="인쇄 (Ctrl+P)"><svg class="ic"><use href="#i-print"/></svg></button><span class="d-tb d-hide-s" title="맞춤법 및 문법 검사 (Ctrl+Alt+X)"><svg class="ic"><use href="#i-spell"/></svg></span><span class="d-tb d-hide-s" title="서식 페인트"><svg class="ic"><use href="#i-paint"/></svg></span><i class="d-sep"></i><button class="d-tb d-dd" data-dd="zoom" title="확대/축소"><span class="lbl">100%</span><svg class="ic s"><use href="#i-drop"/></svg></button><i class="d-sep d-hide-s"></i><button class="d-tb d-dd d-style d-hide-s" data-dd="style" title="스타일"><span class="lbl">일반 텍스트</span><svg class="ic s"><use href="#i-drop"/></svg></button><i class="d-sep"></i><button class="d-tb d-dd d-font" data-dd="font" title="글꼴"><span class="lbl">Arial</span><svg class="ic s"><use href="#i-drop"/></svg></button><i class="d-sep"></i><span class="d-size"><button class="d-tb" data-size="-1" title="글꼴 크기 줄이기 (Ctrl+Shift+,)">−</button><input id="d-size-in" value="11" inputmode="numeric" autocomplete="off" title="글꼴 크기"><button class="d-tb" data-size="1" title="글꼴 크기 늘리기 (Ctrl+Shift+.)">+</button></span><i class="d-sep"></i><button class="d-tb" data-cmd="bold" title="굵게 (Ctrl+B)"><svg class="ic"><use href="#i-bold"/></svg></button><button class="d-tb" data-cmd="italic" title="기울임꼴 (Ctrl+I)"><svg class="ic"><use href="#i-italic"/></svg></button><button class="d-tb" data-cmd="underline" title="밑줄 (Ctrl+U)"><svg class="ic"><use href="#i-under"/></svg></button><button class="d-tb" data-dd="color" title="텍스트 색상"><span class="d-color"><svg class="ic"><use href="#i-tcolor"/></svg><i></i></span></button><button class="d-tb d-hide-s" data-dd="hilite" title="강조 색상"><svg class="ic"><use href="#i-hilite"/></svg></button><i class="d-sep d-hide-m"></i><span class="d-tb d-hide-m" title="링크 삽입 (Ctrl+K)"><svg class="ic"><use href="#i-link"/></svg></span><span class="d-tb d-hide-m" title="댓글 추가 (Ctrl+Alt+M)"><svg class="ic"><use href="#i-addcmt"/></svg></span><span class="d-tb d-hide-m" title="이미지 삽입"><svg class="ic"><use href="#i-image"/></svg></span><i class="d-sep"></i><button class="d-tb d-dd" data-dd="align" title="정렬 및 들여쓰기"><svg class="ic"><use href="#i-align"/></svg><svg class="ic s"><use href="#i-drop"/></svg></button><button class="d-tb d-hide-m" data-dd="spacing" title="줄 및 단락 간격"><svg class="ic"><use href="#i-spacing"/></svg></button><span class="d-tb d-dd d-hide-m" title="체크리스트"><svg class="ic"><use href="#i-check"/></svg><svg class="ic s"><use href="#i-drop"/></svg></span><button class="d-tb d-dd" data-cmd="insertUnorderedList" title="글머리기호 목록 (Ctrl+Shift+8)"><svg class="ic"><use href="#i-bullet"/></svg><svg class="ic s"><use href="#i-drop"/></svg></button><button class="d-tb d-dd" data-cmd="insertOrderedList" title="번호 매기기 목록 (Ctrl+Shift+7)"><svg class="ic"><use href="#i-number"/></svg><svg class="ic s"><use href="#i-drop"/></svg></button><button class="d-tb d-hide-m" data-cmd="outdent" title="내어쓰기 (Ctrl+[)"><svg class="ic"><use href="#i-outdent"/></svg></button><button class="d-tb d-hide-m" data-cmd="indent" title="들여쓰기 (Ctrl+])"><svg class="ic"><use href="#i-indent"/></svg></button><button class="d-tb d-hide-m" data-cmd="removeFormat" title="서식 지우기 (Ctrl+\)"><svg class="ic"><use href="#i-clear"/></svg></button><span class="d-tb d-dd d-mode" title="수정 모드"><svg class="ic s"><use href="#i-pencil"/></svg><span class="d-hide-m">수정</span><svg class="ic s"><use href="#i-drop"/></svg></span><span class="d-tb" title="메뉴 숨기기 (Ctrl+Shift+F)"><svg class="ic"><use href="#i-up"/></svg></span></div>
@@ -327,6 +351,13 @@
 <div id="yt-wrap" class="hide"><div id="yt-host"></div></div>
 <div id="menu" hidden></div>
 <div id="d-pop" hidden></div>
+<aside id="d-chat" hidden>
+  <div class="dc-head"><span>댓글</span><button data-doc="chatclose" title="닫기"><svg class="ic"><use href="#m-close"/></svg></button></div>
+  <div class="dc-list"></div>
+  <p class="dc-note"></p>
+  <form class="dc-name" hidden><label>댓글에 표시할 이름</label><input maxlength="20" autocomplete="off" placeholder="이름"><div class="dc-btns"><button type="submit" class="dc-send">확인</button></div></form>
+  <form class="dc-form" hidden><textarea rows="2" maxlength="300" placeholder="댓글 추가"></textarea><div class="dc-btns"><button type="submit" class="dc-send">댓글</button></div></form>
+</aside>
 <div id="d-count" hidden><div class="d-dialog"><h3>글자 수</h3><table><tr><td>단어</td><td data-count="words"></td></tr><tr><td>문자</td><td data-count="chars"></td></tr><tr><td>공백 제외 문자</td><td data-count="nospace"></td></tr></table><div class="d-dialog-btns"><button data-doc="countclose">확인</button></div></div></div>
 <div id="d-log" hidden><div class="d-dialog d-keys d-log"><h3>업데이트 내역</h3><p class="d-intro">지금까지 생긴 기능들이에요. 나중에 다시 보려면 도움말 → 업데이트 내역.</p><div class="d-log-body"></div><div class="d-dialog-btns"><button data-doc="logclose"><span class="d-notintro">닫기</span><span class="d-intro">시작하기</span></button></div></div></div>
 <div id="d-keys" hidden><div class="d-dialog d-keys"><h3>단축키</h3><p class="d-intro">처음 오셨네요! 겉으로는 문서처럼 보이지만 음악을 들을 수 있는 페이지예요. 단축키부터 알아 두세요. 나중에 다시 보려면 Ctrl+/ 또는 도움말 → 단축키.</p><div class="d-keys-body"></div><div class="d-dialog-btns"><button data-doc="intronext" class="d-intro">다음: 업데이트 내역</button><button data-doc="keysclose" class="d-notintro">닫기</button></div></div></div>
@@ -339,6 +370,8 @@ const CONFIG = {
   invidious: 'https://yt.chocolatemoo53.com',
   // 이 컴퓨터에서 도는 다운로드 서버 (~/stealth-music/dl)
   dlUrl: 'http://localhost:8790',
+  // 친구 채팅: 러버블 서버가 비밀번호를 확인하고 채팅 서버로 중계 (lovable/src/lib/chat-proxy.ts)
+  chatUrl: '/api/chat',
   panicUrl: 'https://docs.google.com/document/u/0/',
 };
 
@@ -356,6 +389,7 @@ const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked:
 const FIRST_VISIT = (() => { try { return !localStorage.getItem(KEY); } catch (e) { return false; } })();
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
 let saveTimer;
+addEventListener('pagehide', () => { clearTimeout(saveTimer); try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} });
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }, 200); }
 const setting = k => store.settings[k] || CONFIG[k];
 // 영상/음악: 음악 화면에서 📺 영상 화면이 열려 있으면 영상, 그 밖(음악 화면, 빠른 패널)은 음악.
@@ -547,6 +581,7 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 2일', [
+    '친구 채팅: 문서 오른쪽 위 댓글 아이콘을 누르면 댓글 창처럼 생긴 대화창이 열림. 친구가 접속해 있으면 "나" 옆에 동그라미가 보이고, 새 글이 오면 아이콘에 작은 점',
     '처음 들어온 사람에게 단축키와 업데이트 내역을 한 번 보여 줌',
     '업데이트 내역: 도움말 → 업데이트 내역',
     '단축키 목록: Ctrl+/ 또는 도움말 → 단축키',
@@ -609,6 +644,8 @@ document.addEventListener('click', e => {
   if (d.dataset.doc === 'keysclose') $('#d-keys').hidden = true;
   if (d.dataset.doc === 'intronext') { $('#d-keys').hidden = true; showLog(true); }
   if (d.dataset.doc === 'log') showLog();
+  if (d.dataset.doc === 'chat') openChat();
+  if (d.dataset.doc === 'chatclose') openChat(false);
   if (d.dataset.doc === 'logclose') $('#d-log').hidden = true;
 });
 sizeIn.addEventListener('keydown', e => {
@@ -938,7 +975,7 @@ let mode = 'doc', quickOpen = false, route = { name: 'home' }, lastRoute = { nam
 function setMode(m) {
   mode = m;
   $('#music').hidden = m !== 'music';
-  if (m === 'music') { toggleQuick(false); renderAll(); }
+  if (m === 'music') { toggleQuick(false); openChat(false); renderAll(); }
   hideMenu();
   placePlayer();
   onKindChange();
@@ -1538,6 +1575,7 @@ window.addEventListener('keydown', e => {
     if (!$('#d-count').hidden) { $('#d-count').hidden = true; return; }
     if (!$('#d-keys').hidden) { $('#d-keys').hidden = true; return; }
     if (!$('#d-log').hidden) { $('#d-log').hidden = true; return; }
+    if (!$('#d-chat').hidden) { openChat(false); return; }
     if (!dPop.hidden) { hidePop(); return; }
     if (!$('#menu').hidden) hideMenu();
     else if (quickOpen) toggleQuick(false);
@@ -1549,6 +1587,94 @@ window.addEventListener('keydown', e => {
     else if (e.code === 'KeyV') { go(route.name === 'video' ? lastRoute : { name: 'video' }); renderNow(); }
   }
 }, true);
+
+// ---------- 친구 채팅 (문서의 '댓글' 창, 오른쪽 위 접속 표시) ----------
+const chatEl = $('#d-chat'), chatList = $('#d-chat .dc-list'), chatDot = $('.d-right [data-doc="chat"] .d-dot');
+const chat = { since: 0, msgs: [], online: [], timer: 0, busy: false, again: false };
+const chatName = () => store.settings.chatName || '';
+const nameColor = name => { let h = 0; for (const c of name) h = (h * 31 + c.codePointAt(0)) % 360; return `hsl(${h} 45% 45%)`; };
+const nameCircle = (name, cls) => `<span class="${cls}" style="background:${nameColor(name)}" title="${esc(name)}">${esc([...name][0] || '?')}</span>`;
+function chatTime(at) {
+  const d = new Date(at), t = d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+  return d.toDateString() === new Date().toDateString() ? t : `${d.getMonth() + 1}월 ${d.getDate()}일 ${t}`;
+}
+const setChatNote = t => { $('#d-chat .dc-note').textContent = t; };
+async function chatRequest(body) {
+  const r = await fetch(setting('chatUrl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ ...body, name: chatName(), since: chat.since }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error) throw new Error(j.error || r.status);
+  return j;
+}
+function markChatSeen() {
+  const last = chat.msgs.length ? chat.msgs[chat.msgs.length - 1].id : 0;
+  if (last > (store.settings.chatSeen || 0)) { store.settings.chatSeen = last; save(); }
+  chatDot.hidden = true;
+}
+function chatApply(j) {
+  for (const m of j.messages || []) if (m.id > chat.since) { chat.msgs.push(m); chat.since = m.id; }
+  chat.msgs = chat.msgs.slice(-100);
+  chat.online = j.online || [];
+  $('#d-people').innerHTML = chat.online.filter(n => n !== chatName()).map(n => nameCircle(n, 'd-avatar')).join('');
+  if (!chatEl.hidden) markChatSeen();
+  else chatDot.hidden = !chat.msgs.some(m => m.id > (store.settings.chatSeen || 0) && m.name !== chatName());
+  renderChat();
+}
+function renderChat() {
+  if (chatEl.hidden) return;
+  const atBottom = chatList.scrollTop + chatList.clientHeight >= chatList.scrollHeight - 30;
+  chatList.innerHTML = chat.msgs.map(m => `<div class="dc-msg"><div class="dc-who">${nameCircle(m.name, 'dc-av')}<div class="dc-name"><b>${esc(m.name)}</b><div class="dc-time">${chatTime(m.at)}</div></div></div><div class="dc-text">${esc(m.text)}</div></div>`).join('')
+    || '<p class="dc-empty">아직 댓글이 없어요</p>';
+  if (atBottom) chatList.scrollTop = chatList.scrollHeight;
+}
+// 창이 열려 있으면 3초, 닫혀 있으면 15초(접속 표시·새 글 점), 탭이 안 보이면 1분마다
+function scheduleChat() {
+  clearTimeout(chat.timer);
+  if (chatName()) chat.timer = setTimeout(chatPoll, !chatEl.hidden ? 3000 : document.hidden ? 60000 : 15000);
+}
+async function chatPoll() {
+  if (!chatName()) return;
+  if (chat.busy) { chat.again = true; return; }
+  chat.busy = true;
+  try { chatApply(await chatRequest({ action: 'poll' })); setChatNote(''); }
+  catch (e) { setChatNote('댓글을 불러오지 못했어요. 잠시 후 다시 시도해요.'); }
+  finally {
+    chat.busy = false;
+    if (chat.again) { chat.again = false; chatPoll(); } else scheduleChat();
+  }
+}
+async function chatSend(text) {
+  if (!text.trim()) return false;
+  try { chatApply(await chatRequest({ action: 'send', text })); setChatNote(''); return true; }
+  catch (e) { setChatNote('댓글을 보내지 못했어요.'); return false; }
+}
+function openChat(open = chatEl.hidden) {
+  chatEl.hidden = !open;
+  if (!open) return scheduleChat();
+  const named = !!chatName();
+  $('#d-chat .dc-name').hidden = named;
+  $('#d-chat .dc-form').hidden = !named;
+  renderChat(); markChatSeen();
+  if (named) { chatPoll(); setTimeout(() => $('#d-chat textarea').focus(), 0); }
+  else setTimeout(() => $('#d-chat .dc-name input').focus(), 0);
+}
+$('#d-chat .dc-name').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#d-chat .dc-name input').value.trim().slice(0, 20);
+  if (!v) return;
+  store.settings.chatName = v; save();
+  openChat(true);
+});
+$('#d-chat .dc-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const ta = $('#d-chat textarea');
+  if (await chatSend(ta.value)) ta.value = '';
+});
+// Enter로 보내기, Shift+Enter는 줄바꿈. 한글 조합 중 Enter는 무시 (반쪽 글자가 보내지지 않게)
+$('#d-chat textarea').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); $('#d-chat .dc-form').requestSubmit(); }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) chatPoll(); });
+chatPoll();
 
 // 처음 온 사람에게만: 단축키 → 업데이트 내역. 띄우는 순간 봤음으로 저장해서 다시는 안 뜬다
 if (FIRST_VISIT && !store.settings.introSeen) { store.settings.introSeen = true; save(); showKeys(true); }
