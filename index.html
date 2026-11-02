@@ -63,8 +63,9 @@
   #d-pop .d-swatches { display: grid; grid-template-columns: repeat(10, 20px); gap: 4px; padding: 6px 12px; }
   #d-pop .d-sw { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #dadce0; cursor: pointer; font-size: 0; }
   #d-pop .d-none { padding: 6px 12px; cursor: pointer; }
-  #d-count, #d-keys { position: fixed; inset: 0; z-index: 80; background: rgba(32,33,36,.6); display: grid; place-items: center; }
-  #d-count[hidden], #d-keys[hidden] { display: none; }
+  #d-count, #d-keys, #d-log { position: fixed; inset: 0; z-index: 80; background: rgba(32,33,36,.6); display: grid; place-items: center; }
+  #d-count[hidden], #d-keys[hidden], #d-log[hidden] { display: none; }
+  .d-log ul { margin: 0 0 4px; padding-left: 20px; font-size: 14px; line-height: 1.6; color: #3c4043; }
   .d-keys { width: min(560px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; }
   .d-keys h4 { margin: 18px 0 6px; font-size: 14px; color: #1f1f1f; text-align: left; }
   .d-keys th { padding: 0; }
@@ -80,7 +81,7 @@
   .d-dialog-btns button { background: #0b57d0; color: #fff; border-radius: 18px; padding: 8px 20px; font-size: 14px; }
   @media print {
     html, body { height: auto; overflow: visible; background: #fff; }
-    #music, #quick, #yt-wrap, #menu, #toast, #d-pop, #d-count, #d-keys, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
+    #music, #quick, #yt-wrap, #menu, #toast, #d-pop, #d-count, #d-keys, #d-log, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
     #doc, .d-canvas { display: block; height: auto; overflow: visible; background: #fff; }
     .d-pages { padding: 0; }
     .d-page { box-shadow: none; margin: 0; padding: 0; width: auto; max-width: none; min-height: 0; zoom: 1 !important; }
@@ -324,6 +325,7 @@
 <div id="menu" hidden></div>
 <div id="d-pop" hidden></div>
 <div id="d-count" hidden><div class="d-dialog"><h3>글자 수</h3><table><tr><td>단어</td><td data-count="words"></td></tr><tr><td>문자</td><td data-count="chars"></td></tr><tr><td>공백 제외 문자</td><td data-count="nospace"></td></tr></table><div class="d-dialog-btns"><button data-doc="countclose">확인</button></div></div></div>
+<div id="d-log" hidden><div class="d-dialog d-keys d-log"><h3>업데이트 내역</h3><div class="d-log-body"></div><div class="d-dialog-btns"><button data-doc="logclose">닫기</button></div></div></div>
 <div id="d-keys" hidden><div class="d-dialog d-keys"><h3>단축키</h3><div class="d-keys-body"></div><div class="d-dialog-btns"><button data-doc="keysclose">닫기</button></div></div></div>
 <div id="toast" hidden></div>
 
@@ -501,7 +503,7 @@ function showPop(kind, anchor) {
     color: () => swatches(false),
     hilite: () => swatches(true),
     file: () => item('txt', '다운로드 (.txt)'),
-    help: () => item('keys', '단축키 (Ctrl+/)'),
+    help: () => item('keys', '단축키 (Ctrl+/)') + item('log', '업데이트 내역'),
   }[kind]();
   dPop.hidden = false;
   const r = anchor.getBoundingClientRect();
@@ -512,7 +514,7 @@ const hidePop = () => { dPop.hidden = true; popKind = ''; };
 function applyPop(kind, v) {
   if (kind === 'zoom') { applyZoom(+v); store.settings.docZoom = +v; save(); return; }
   if (kind === 'file') return downloadDoc();
-  if (kind === 'help') return showKeys();
+  if (kind === 'help') return v === 'log' ? showLog() : showKeys();
   if (kind === 'size') return applySize(+v);
   if (kind === 'spacing') return applyLineHeight(v);
   restoreRange();
@@ -537,6 +539,32 @@ const SHORTCUTS = [
   ['문서', [['Ctrl+B / Ctrl+I / Ctrl+U', '굵게 / 기울임 / 밑줄'], ['Ctrl+Z / Ctrl+Y', '실행취소 / 재실행'], ['Ctrl+Shift+> / Ctrl+Shift+<', '글자 크기 1pt 크게 / 작게'], ['Ctrl+Shift+C', '글자 수'], ['Ctrl+P', '인쇄 (문서만)'], ['Ctrl+/', '이 단축키 목록']]],
   ['빠른 패널', [['위쪽 줄 끌기', '옮기기'], ['오른쪽 아래 모서리 끌기', '크기 조절'], ['위쪽 줄 두 번 누르기', '원래 자리로'], ['검색창에서 Enter', '검색']]],
 ];
+// 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
+const CHANGELOG = [
+  ['11월 2일', [
+    '단축키 목록: Ctrl+/ 또는 도움말 → 단축키',
+    '문서에 쓰는 중에도 되는 음악 단축키: Alt+. 다음 곡, Alt+, 이전 곡, Alt+L 좋아요, Alt+X 싫어요',
+    '빠른 패널(Ctrl+J): 위쪽 줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기 조절 (위쪽 줄 두 번 누르면 원래 자리)',
+    '문서 기능이 진짜로 작동: 글꼴, 글자 크기, 제목 스타일, 글자 색·형광펜, 정렬, 줄 간격, 확대/축소, 인쇄, 글자 수(Ctrl+Shift+C), 파일 → 다운로드(.txt)',
+    '음악 화면 아이콘 새로 바꿈, 싫어요는 엄지 아래 모양',
+    '싫어요 목록은 설정 → 싫어요 목록 보기',
+    '자동 추천: 내가 들은 기록을 더 많이 반영, 한 곡 반복으로 여러 번 들은 곡이 더 잘 나옴',
+    '로그인할 때 방문 기록에 로그인 화면이 남지 않음',
+  ]],
+  ['11월 1일', [
+    '비밀번호로 잠금 (한 번 로그인하면 30일 유지)',
+    '영상/음악 기록 따로: 영상 화면을 켜고 본 건 영상 기록, 나머지는 음악 기록. 좋아요·추천도 따로',
+    '곡 MP3/MP4로 받기 (더보기 메뉴, 재생 바, 빠른 패널) — 다운로드 서버가 있는 컴퓨터에서만 됨',
+    '옛 주소(github.io)는 새 주소로 안내',
+  ]],
+  ['10월 30일', ['싫어요 버튼: 누르면 바로 다음 곡, 그 곡과 같은 가수·비슷한 곡이 덜 나옴 (설정에서 해제 가능)']],
+  ['10월 29일', ['자동 추천: 곡이 끝나면 어울리는 곡이 이어서 나옴 (설정에서 끌 수 있음)']],
+];
+function showLog() {
+  hidePop();
+  $('#d-log .d-log-body').innerHTML = CHANGELOG.map(([d, items]) => `<h4>${esc(d)}</h4><ul>${items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`).join('');
+  $('#d-log').hidden = false;
+}
 function showKeys() {
   hidePop();
   $('#d-keys .d-keys-body').innerHTML = '<table>' + SHORTCUTS.map(([h, rows]) => `<tr><th colspan="2"><h4>${esc(h)}</h4></th></tr>${rows.map(([k, d]) =>
@@ -570,6 +598,8 @@ document.addEventListener('click', e => {
   if (d.dataset.doc === 'countclose') $('#d-count').hidden = true;
   if (d.dataset.doc === 'keys') showKeys();
   if (d.dataset.doc === 'keysclose') $('#d-keys').hidden = true;
+  if (d.dataset.doc === 'log') showLog();
+  if (d.dataset.doc === 'logclose') $('#d-log').hidden = true;
 });
 sizeIn.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); hidePop(); applySize(+sizeIn.value); }
@@ -1109,7 +1139,7 @@ function renderMain() {
         <p class="m-hint">좋아요·플레이리스트는 이 브라우저에만 저장돼요. 다른 PC로 옮길 때 파일로 내보내고 가져오세요.</p>
         <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="margin:0;cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label></div>
         <h3>단축키</h3>
-        <button class="pill" data-doc="keys">단축키 보기 (Ctrl+/)</button>
+        <button class="pill" data-doc="keys">단축키 보기 (Ctrl+/)</button> <button class="pill" data-doc="log">업데이트 내역</button>
       </div>`;
   }
   placePlayer();
@@ -1497,6 +1527,7 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (!$('#d-count').hidden) { $('#d-count').hidden = true; return; }
     if (!$('#d-keys').hidden) { $('#d-keys').hidden = true; return; }
+    if (!$('#d-log').hidden) { $('#d-log').hidden = true; return; }
     if (!dPop.hidden) { hidePop(); return; }
     if (!$('#menu').hidden) hideMenu();
     else if (quickOpen) toggleQuick(false);
