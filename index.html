@@ -65,6 +65,9 @@
   #d-pop .d-none { padding: 6px 12px; cursor: pointer; }
   #d-count, #d-keys, #d-log { position: fixed; inset: 0; z-index: 80; background: rgba(32,33,36,.6); display: grid; place-items: center; }
   #d-count[hidden], #d-keys[hidden], #d-log[hidden] { display: none; }
+  /* 첫 방문 안내일 때만 보이는 부분 (.intro가 붙은 창) */
+  #d-keys:not(.intro) .d-intro, #d-log:not(.intro) .d-intro, #d-keys.intro .d-notintro, #d-log.intro .d-notintro { display: none; }
+  p.d-intro { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: #0b57d0; background: #e8f0fe; border-radius: 8px; padding: 10px 12px; }
   .d-log ul { margin: 0 0 4px; padding-left: 20px; font-size: 14px; line-height: 1.6; color: #3c4043; }
   .d-keys { width: min(560px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; }
   .d-keys h4 { margin: 18px 0 6px; font-size: 14px; color: #1f1f1f; text-align: left; }
@@ -325,8 +328,8 @@
 <div id="menu" hidden></div>
 <div id="d-pop" hidden></div>
 <div id="d-count" hidden><div class="d-dialog"><h3>글자 수</h3><table><tr><td>단어</td><td data-count="words"></td></tr><tr><td>문자</td><td data-count="chars"></td></tr><tr><td>공백 제외 문자</td><td data-count="nospace"></td></tr></table><div class="d-dialog-btns"><button data-doc="countclose">확인</button></div></div></div>
-<div id="d-log" hidden><div class="d-dialog d-keys d-log"><h3>업데이트 내역</h3><div class="d-log-body"></div><div class="d-dialog-btns"><button data-doc="logclose">닫기</button></div></div></div>
-<div id="d-keys" hidden><div class="d-dialog d-keys"><h3>단축키</h3><div class="d-keys-body"></div><div class="d-dialog-btns"><button data-doc="keysclose">닫기</button></div></div></div>
+<div id="d-log" hidden><div class="d-dialog d-keys d-log"><h3>업데이트 내역</h3><p class="d-intro">지금까지 생긴 기능들이에요. 나중에 다시 보려면 도움말 → 업데이트 내역.</p><div class="d-log-body"></div><div class="d-dialog-btns"><button data-doc="logclose"><span class="d-notintro">닫기</span><span class="d-intro">시작하기</span></button></div></div></div>
+<div id="d-keys" hidden><div class="d-dialog d-keys"><h3>단축키</h3><p class="d-intro">처음 오셨네요! 겉으로는 문서처럼 보이지만 음악을 들을 수 있는 페이지예요. 단축키부터 알아 두세요. 나중에 다시 보려면 Ctrl+/ 또는 도움말 → 단축키.</p><div class="d-keys-body"></div><div class="d-dialog-btns"><button data-doc="intronext" class="d-intro">다음: 업데이트 내역</button><button data-doc="keysclose" class="d-notintro">닫기</button></div></div></div>
 <div id="toast" hidden></div>
 
 <script>
@@ -349,6 +352,8 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s /
 // ---------- 저장소 ----------
 const KEY = 'sm.v1';
 const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, showQueue: true, doc: null, settings: {} });
+// 이 브라우저에 저장된 게 하나도 없으면 처음 온 사람 (첫 방문 안내용)
+const FIRST_VISIT = (() => { try { return !localStorage.getItem(KEY); } catch (e) { return false; } })();
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
 let saveTimer;
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }, 200); }
@@ -542,6 +547,8 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 2일', [
+    '처음 들어온 사람에게 단축키와 업데이트 내역을 한 번 보여 줌',
+    '업데이트 내역: 도움말 → 업데이트 내역',
     '단축키 목록: Ctrl+/ 또는 도움말 → 단축키',
     '문서에 쓰는 중에도 되는 음악 단축키: Alt+. 다음 곡, Alt+, 이전 곡, Alt+L 좋아요, Alt+X 싫어요',
     '빠른 패널(Ctrl+J): 위쪽 줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기 조절 (위쪽 줄 두 번 누르면 원래 자리)',
@@ -560,13 +567,15 @@ const CHANGELOG = [
   ['10월 30일', ['싫어요 버튼: 누르면 바로 다음 곡, 그 곡과 같은 가수·비슷한 곡이 덜 나옴 (설정에서 해제 가능)']],
   ['10월 29일', ['자동 추천: 곡이 끝나면 어울리는 곡이 이어서 나옴 (설정에서 끌 수 있음)']],
 ];
-function showLog() {
+function showLog(intro = false) {
   hidePop();
+  $('#d-log').classList.toggle('intro', intro);
   $('#d-log .d-log-body').innerHTML = CHANGELOG.map(([d, items]) => `<h4>${esc(d)}</h4><ul>${items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`).join('');
   $('#d-log').hidden = false;
 }
-function showKeys() {
+function showKeys(intro = false) {
   hidePop();
+  $('#d-keys').classList.toggle('intro', intro);
   $('#d-keys .d-keys-body').innerHTML = '<table>' + SHORTCUTS.map(([h, rows]) => `<tr><th colspan="2"><h4>${esc(h)}</h4></th></tr>${rows.map(([k, d]) =>
     `<tr><td>${k.split(' / ').map(x => x.split(' 또는 ').map(y => /^[A-Za-z\[]|^Ctrl|^Alt|^Esc|^Space/.test(y) ? `<kbd>${esc(y)}</kbd>` : esc(y)).join(' 또는 ')).join(' / ')}</td><td>${esc(d)}</td></tr>`).join('')}`).join('') + '</table>';
   $('#d-keys').hidden = false;
@@ -598,6 +607,7 @@ document.addEventListener('click', e => {
   if (d.dataset.doc === 'countclose') $('#d-count').hidden = true;
   if (d.dataset.doc === 'keys') showKeys();
   if (d.dataset.doc === 'keysclose') $('#d-keys').hidden = true;
+  if (d.dataset.doc === 'intronext') { $('#d-keys').hidden = true; showLog(true); }
   if (d.dataset.doc === 'log') showLog();
   if (d.dataset.doc === 'logclose') $('#d-log').hidden = true;
 });
@@ -1540,6 +1550,8 @@ window.addEventListener('keydown', e => {
   }
 }, true);
 
+// 처음 온 사람에게만: 단축키 → 업데이트 내역. 띄우는 순간 봤음으로 저장해서 다시는 안 뜬다
+if (FIRST_VISIT && !store.settings.introSeen) { store.settings.introSeen = true; save(); showKeys(true); }
 </script>
 </body>
 </html>
