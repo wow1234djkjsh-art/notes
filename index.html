@@ -624,6 +624,11 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 4일', [
+    'MP4 받기가 훨씬 빨라짐 (3분짜리 곡 약 1분 → 20초 안팎). YouTube 480p 영상이 정해 둔 사양과 맞으면 다시 만들지 않고 그대로 씀',
+    '다운로드 실패 문구를 이유별로: 서버 꺼짐 / 서버가 거절함 / 다 만든 파일이 없어짐',
+    '추천을 기다리는 중에 영상 화면을 켜고 꺼도 다음 곡이 이어서 나옴',
+  ]],
   ['11월 3일', [
     '다운로드: 받는 중이거나 기다리는 곡에 "취소" 버튼. 탭을 닫으면 아직 안 끝난 다운로드도 멈춤. "앞에 N개"가 다른 탭에서 넣은 것까지 셈',
     '다운로드: 여러 곡을 줄 세워 받을 때 다 만든 파일이 가져가기 전에 지워지던 문제 고침',
@@ -807,7 +812,12 @@ function next(auto, fromError) {
     if (Q.waiting) return;
     const gen = Q.gen;
     Q.waiting = true;
-    refillAuto().then(() => {
+    // 기다리는 사이 영상/음악 쪽이 바뀌면(📺) 그 채우기 결과는 버려지므로 지금 기준으로 다시 기다린다 (최대 2번 더)
+    const wait = tries => {
+      const token = autoToken();
+      return refillAuto().then(() => (!Q.auto.length && token !== autoToken() && tries > 0 ? wait(tries - 1) : null));
+    };
+    wait(2).then(() => {
       if (gen !== Q.gen) return;
       Q.waiting = false;
       if (Q.i + 1 < Q.list.length) { Q.i++; return playCurrent(); } // 기다리는 동안 "다음에 재생"으로 넣은 곡
@@ -1466,10 +1476,13 @@ async function downloadTrack(t, fmt, d = { key: ++dlSeq, t, fmt }) {
   let job;
   try {
     const r = await fetch(base + '/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, fmt }) });
-    if (!r.ok) throw new Error(r.status);
+    if (!r.ok) return dlFail(d, `다운로드 서버가 요청을 거절했어요 (HTTP ${r.status})`);
     job = String((await r.json()).job || '');
     if (!/^\w+$/.test(job)) throw new Error('job');
-  } catch (e) { return dlFail(d, '다운로드 서버가 꺼져 있어요', DL_OFF); }
+  } catch (e) {
+    // 연결 자체가 안 되면(fetch가 TypeError) 꺼진 것, 그 밖(이상한 답)은 그대로 알린다
+    return e instanceof TypeError ? dlFail(d, '다운로드 서버가 꺼져 있어요', DL_OFF) : dlFail(d, '다운로드 서버의 답을 이해하지 못했어요');
+  }
   d.job = job;
   dlChanged(); // 작업 번호가 생겨야 취소 버튼을 보여 줄 수 있다
   toast(`${label} 받기 시작 (진행 상황은 다운로드 탭에)`);
@@ -1497,13 +1510,17 @@ async function downloadTrack(t, fmt, d = { key: ++dlSeq, t, fmt }) {
     }
     d.state = 'saving'; dlChanged();
     const r = await fetch(`${base}/jobs/${job}/file`);
-    if (!r.ok) throw new Error(r.status);
+    if (r.status === 404) return dlFail(d, '다 만든 파일이 없어졌어요. 한 번 더 눌러 주세요');
+    if (!r.ok) return dlFail(d, `파일을 받지 못했어요 (HTTP ${r.status})`);
     const u = URL.createObjectURL(await r.blob()), link = document.createElement('a');
     link.href = u; link.download = fileNameOf(r.headers.get('Content-Disposition')) || `${t.title}.${fmt}`;
     link.click(); setTimeout(() => URL.revokeObjectURL(u), 10000);
     d.state = 'done'; dlChanged();
     toast('다운로드 폴더에 저장했어요');
-  } catch (e) { dlFail(d, '다운로드 서버가 꺼져 있어요', DL_OFF); }
+  } catch (e) {
+    if (e instanceof TypeError) dlFail(d, '다운로드 서버가 꺼져 있어요', DL_OFF);
+    else dlFail(d, '다운로드 서버의 답을 이해하지 못했어요');
+  }
 }
 
 // 다음 곡 버튼·Alt+. : 처음 30초 안에 넘기면 skip으로 센다
