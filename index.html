@@ -253,6 +253,7 @@
   .m-main { overflow: auto; container-type: inline-size; scroll-behavior: auto; }
   .m-main h1, .m-main h2, .m-main h3 { margin: 0; }
   .pad { padding: 24px; }
+  .pad .tbl { padding: 0; }
   .pad > h1 { font-size: clamp(28px, 5cqw, 48px); font-weight: 900; letter-spacing: -.02em; margin-bottom: 16px; }
   .m-hint { color: var(--sub); font-size: 14px; line-height: 1.5; }
   .pill { height: 32px; padding: 0 16px; border: 1px solid #7c7c7c; border-radius: 16px; font-size: 14px; font-weight: 700; color: #fff; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -488,7 +489,11 @@
   .lyr p.past { color: rgba(255,255,255,.75); }
   .lyr p.on { color: #fff; }
   .lyr.plain p { color: #fff; cursor: text; }
-  .lyr-note { font-size: 14px; font-weight: 400; color: rgba(255,255,255,.8); margin-top: 32px; letter-spacing: 0; }
+  .lyr-shift { position: sticky; top: 0; float: right; display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,.45); border-radius: 16px; padding: 2px 4px; font-size: 13px; font-weight: 400; letter-spacing: 0; z-index: 2; }
+  .lyr-shift span { padding: 0 6px; color: #fff; min-width: 56px; text-align: center; }
+  .lyr-shift button { color: #fff; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 13px; }
+  .lyr-shift button:hover { background: rgba(255,255,255,.2); }
+  .lyr-note { clear: both; font-size: 14px; font-weight: 400; color: rgba(255,255,255,.8); margin-top: 32px; letter-spacing: 0; }
 
   /* 프로필, 설정, 다운로드, 영상 */
   .kpis { display: flex; gap: 32px; flex-wrap: wrap; padding: 0 24px 8px; color: var(--sub); }
@@ -559,6 +564,19 @@
   .right button.on { color: var(--acc); }
   .right input[type=range] { max-width: 110px; flex: 0 1 110px !important; }
   @media (max-width: 1180px) { .right .opt { display: none; } }
+  @media (max-width: 1000px) {
+    #music, #music.no-right { grid-template-columns: var(--lw) minmax(0, 1fr); }
+    .m-right { position: fixed; right: 8px; top: 64px; bottom: 80px; width: min(320px, calc(100vw - 16px)); z-index: 25; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+    .m-right > .m-resize { display: none; }
+  }
+  @media (max-width: 760px) {
+    .m-top { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .m-tl button:last-child, .m-search .sep, #b-browse, .m-homeb { display: none; }
+    .m-bar { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .seek { display: none; }
+    .right input[type=range], #b-video, #b-mute { display: none; }
+    .now button { display: none; }
+  }
 
   /* 메뉴, 창, 전체 화면 */
   .m-modal { position: fixed; inset: 0; z-index: 75; background: rgba(0,0,0,.7); display: grid; place-items: center; color: #fff; font-family: Figtree, "Noto Sans KR", "Malgun Gothic", sans-serif; }
@@ -781,7 +799,7 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s /
 
 // ---------- 저장소 ----------
 const KEY = 'sm.v1';
-const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, smart: false, panel: 'now', doc: null, settings: {}, following: [], folders: [], searches: [], pins: ['liked'], played: {}, lib: {} });
+const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, smart: false, panel: 'now', doc: null, settings: {}, following: [], folders: [], searches: [], pins: ['liked'], played: {}, lib: {}, lyricShift: {} });
 // 이 브라우저에 저장된 게 하나도 없으면 처음 온 사람 (첫 방문 안내용)
 const FIRST_VISIT = (() => { try { return !localStorage.getItem(KEY); } catch (e) { return false; } })();
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
@@ -1009,6 +1027,23 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 5일', [
+    '음악 화면을 스포티파이처럼 전부 새로 만듦: 위쪽 검색창과 뒤로·앞으로, 왼쪽 내 라이브러리, 오른쪽 지금 재생 중 패널, 아래 재생 바, 표지 색으로 칠해지는 화면',
+    '곡은 한 번 누르면 선택, 두 번 누르면 재생. 마우스를 올리면 나오는 재생 버튼으로도 재생. Ctrl·Shift로 여러 곡 선택, 오른쪽 클릭 메뉴',
+    '대기열: "대기열에 추가"한 곡이 재생 중인 목록의 남은 곡보다 먼저 나옴. 다른 목록을 틀어도 남음. 끌어서 순서 바꾸기, 비우기, 최근 재생 탭',
+    '끌어다 놓기: 곡을 왼쪽 플레이리스트·좋아요·오른쪽 대기열로, 플레이리스트 안에서 순서 바꾸기, 플레이리스트를 폴더로',
+    '플레이리스트: 이름·설명·표지 사진 바꾸기, 복제, 곡 찾아 넣기, 추천 곡, 열 눌러 정렬, 목록 안에서 찾기, 간략히 보기',
+    '내 라이브러리: 종류별로 보기, 찾기, 정렬, 고정, 폴더, 그리드 보기, 접기, 폭 조절',
+    '홈: 빠른 타일, 최근 재생, 나를 위한 믹스, 자주 듣는 곡, 다시 들어 보세요, 인기 음악',
+    '검색: 치는 대로 찾기, 둘러보기 타일, 최근 검색, 상위 결과',
+    '아티스트 화면과 팔로우, 프로필(많이 들은 곡·아티스트), 곡 라디오',
+    '가사: 곡에 맞춰 줄이 따라가고, 줄을 누르면 그 부분으로 이동. 어긋나면 늦추기·앞당기기 (L 또는 마이크 버튼)',
+    '친구 활동: 친구가 듣는 곡을 보고, 눌러서 듣거나 "같이 듣기"로 따라 듣기. 설정에서 끌 수 있음',
+    '스마트 셔플, 수면 타이머, 재생 속도, 음소거, 비공개 세션, 전체 화면, 미니 플레이어',
+    '곡 제목을 깔끔하게 보여 줌 ([MV], Official Video 같은 말을 빼고 곡 이름과 가수를 나눔)',
+    '단축키 추가 (Ctrl+/ 로 확인)',
+    'MP4를 전자사전 추천값에 맞춤: 영상 800~1500 kbps. 범위 밖 영상은 다시 만들어서 전보다 오래 걸림',
+  ]],
   ['11월 4일', [
     'MP4 받기가 훨씬 빨라짐 (3분짜리 곡 약 1분 → 20초 안팎). YouTube 480p 영상이 정해 둔 사양과 맞으면 다시 만들지 않고 그대로 씀',
     '다운로드 실패 문구를 이유별로: 서버 꺼짐 / 서버가 거절함 / 다 만든 파일이 없어짐',
@@ -1059,7 +1094,7 @@ function showKeys(intro = false) {
   hidePop();
   $('#d-keys').classList.toggle('intro', intro);
   $('#d-keys .d-keys-body').innerHTML = '<table>' + SHORTCUTS.map(([h, rows]) => `<tr><th colspan="2"><h4>${esc(h)}</h4></th></tr>${rows.map(([k, d]) =>
-    `<tr><td>${k.split(' / ').map(x => x.split(' 또는 ').map(y => /^[A-Za-z\[]|^Ctrl|^Alt|^Esc|^Space/.test(y) ? `<kbd>${esc(y)}</kbd>` : esc(y)).join(' 또는 ')).join(' / ')}</td><td>${esc(d)}</td></tr>`).join('')}`).join('') + '</table>';
+    `<tr><td>${k.split(' / ').map(x => x.split(' 또는 ').map(y => /^[A-Za-z\[/]|^Ctrl|^Alt|^Esc|^Space/.test(y) ? `<kbd>${esc(y)}</kbd>` : esc(y)).join(' 또는 ')).join(' / ')}</td><td>${esc(d)}</td></tr>`).join('')}`).join('') + '</table>';
   $('#d-keys').hidden = false;
 }
 function showCount() {
@@ -1573,7 +1608,11 @@ let mode = 'doc', quickOpen = false, route = { name: 'home' }, lastRoute = { nam
 function setMode(m) {
   mode = m;
   $('#music').hidden = m !== 'music';
-  if (m === 'music') { toggleQuick(false); openChat(false); applyWidths(); renderAll(); }
+  if (m === 'music') {
+    toggleQuick(false); openChat(false); applyWidths();
+    if (innerWidth <= 1000) store.panel = ''; // 좁은 창에서는 패널이 가운데를 덮으니 처음엔 닫아 둔다
+    renderAll();
+  }
   else { if (fsOpen) openFs(false); closeModal(); }
   hideMenu();
   placePlayer();
@@ -1912,10 +1951,10 @@ function renderSearch(el) {
   const chips = `<div class="chips search-chips">${[['all', '모두'], ['songs', '곡'], ['artists', '아티스트']].map(([k, l]) => `<button class="chip${searchTab === k ? ' on' : ''}" data-act="searchchip" data-id="${k}">${l}</button>`).join('')}</div>`;
   if (!res.length) { lists.search = []; el.innerHTML = `<div class="pad"><p class="m-hint">결과가 없어요</p></div>`; return; }
   let body;
-  if (searchTab === 'songs') body = trackTable('search', res).replace('class="tbl', 'style="padding:0" class="tbl');
+  if (searchTab === 'songs') body = trackTable('search', res);
   else if (searchTab === 'artists') { lists.search = res; body = `<div class="gridall">${artists.map(cardArtist).join('')}</div>`; }
   else {
-    const t = res[0], m = meta(t), rows = trackTable('search', res, { head: false, limit: 4 }).replace('class="tbl', 'style="padding:0" class="tbl');
+    const t = res[0], m = meta(t), rows = trackTable('search', res, { head: false, limit: 4 });
     body = `<div class="sres"><section><h2>상위 결과</h2><div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="t1">${esc(m.title)}</div><div class="t2">곡 · ${esc(m.artist)}</div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div></section><section><h2>곡</h2>${rows}</section></div>
       ${artists.length ? shelf('아티스트', artists.slice(0, 12).map(cardArtist).join('')) : ''}
       ${res.length > 4 ? `<section class="shelf"><div class="shelf-h"><h2>더 많은 곡</h2></div><div class="row1">${res.slice(4, 16).map((x, i) => cardTrack('search', x, i + 4)).join('')}</div></section>` : ''}`;
@@ -1943,20 +1982,29 @@ function loadRecs(p) {
   const seed = p.tracks[Math.floor(Math.random() * p.tracks.length)];
   if (!seed) return;
   const r = plRecs[p.id] = { list: [], loading: true };
-  fetchMix(seed.id).then(mix => {
-    r.list = mix; r.loading = false;
-    if (route.name === 'playlist' && route.id === p.id) renderMain();
-  });
+  fetchMix(seed.id).then(mix => { r.list = mix; r.loading = false; paintFinder(p); });
+}
+function finderResults(p) {
+  const f = finderOf(p.id), have = new Set(p.tracks.map(t => t.id));
+  return f.loading ? '<p class="m-hint">검색 중…</p>' : f.error ? `<p class="m-hint">${esc(f.error)}</p>` : offerRows('find:' + p.id, f.results.filter(t => !have.has(t.id)).slice(0, 10), p.id);
+}
+function finderRecs(p) {
+  const have = new Set(p.tracks.map(t => t.id)), recs = (plRecs[p.id]?.list || []).filter(t => !have.has(t.id)).slice(0, 10);
+  return recs.length ? `<div class="shelf-h" style="margin-top:24px"><h2>추천</h2><a class="more" data-act="plrecs" data-id="${p.id}">새로고침</a></div><p class="m-hint" style="margin:0 0 8px">이 플레이리스트의 곡을 바탕으로</p>${offerRows('rec:' + p.id, recs, p.id)}` : '';
+}
+// 결과가 늦게 와도 이 칸만 바꾼다 (화면 전체를 다시 그리면 입력 중인 글자가 지워진다)
+function paintFinder(p) {
+  if (route.name !== 'playlist' || route.id !== p.id) return;
+  const a = $('#f-res'), b = $('#f-rec');
+  if (a) a.innerHTML = finderResults(p);
+  if (b) b.innerHTML = finderRecs(p);
 }
 function finderHtml(p) {
-  const f = finderOf(p.id), have = new Set(p.tracks.map(t => t.id));
   if (p.tracks.length && !plRecs[p.id]) loadRecs(p);
-  const recs = (plRecs[p.id]?.list || []).filter(t => !have.has(t.id)).slice(0, 10);
   return `<div class="finder">
     <h2>이 플레이리스트에 추가할 곡을 찾아볼까요?</h2>
-    <form data-form="plfind" data-id="${p.id}">${ic('search')}<input value="${esc(f.q)}" placeholder="곡 검색" autocomplete="off" spellcheck="false"></form>
-    ${f.loading ? '<p class="m-hint">검색 중…</p>' : f.error ? `<p class="m-hint">${esc(f.error)}</p>` : offerRows('find:' + p.id, f.results.filter(t => !have.has(t.id)).slice(0, 10), p.id)}
-    ${recs.length ? `<div class="shelf-h" style="margin-top:24px"><h2>추천</h2><a class="more" data-act="plrecs" data-id="${p.id}">새로고침</a></div><p class="m-hint" style="margin:0 0 8px">이 플레이리스트의 곡을 바탕으로</p>${offerRows('rec:' + p.id, recs, p.id)}` : ''}
+    <form data-form="plfind" data-id="${p.id}">${ic('search')}<input value="${esc(finderOf(p.id).q)}" placeholder="곡 검색" autocomplete="off" spellcheck="false"></form>
+    <div id="f-res">${finderResults(p)}</div><div id="f-rec">${finderRecs(p)}</div>
   </div>`;
 }
 function renderPlaylist(el, r) {
@@ -2196,14 +2244,18 @@ function setPanel(name) {
   save();
   if (store.panel === 'queue') renderQueue();
   renderRight();
+  if (store.panel === 'friends') chatPoll();
 }
 function nextUp() { return Q.list[Q.i + 1] || (useAuto() ? Q.auto[0] : null) || null; }
 function renderNowView() {
   const el = $('#nowview'), t = current();
   if (store.panel !== 'now') return;
-  if (!t) { el.innerHTML = `<div class="rp-head"><b>지금 재생 중</b>${closeBtn}</div><div class="rp-body"><p class="m-hint">재생 중인 곡이 없어요</p></div>`; return; }
+  if (!t) { el.dataset.sig = ''; el.innerHTML = `<div class="rp-head"><b>지금 재생 중</b>${closeBtn}</div><div class="rp-body"><p class="m-hint">재생 중인 곡이 없어요</p></div>`; return; }
   const m = meta(t), n = nextUp(), liked = isLiked(t.id), s = bucket().stats[t.id], ctx = Q.ctx;
-  el.innerHTML = `<div class="rp-head"><b>${ctx?.route ? `<a data-act="go" data-route="${esc(ctx.route.name)}" data-id="${esc(ctx.route.id ?? '')}">${esc(ctx.name)}</a>` : esc(ctx?.name || '지금 재생 중')}</b><span style="display:flex;gap:4px"><button data-act="nowmore" title="더보기">${ic('more')}</button>${closeBtn}</span></div>
+  const sig = [t.id, liked, s?.plays, n?.id, ctx?.name, isFollowing(m.artist)].join('|');
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  el.innerHTML = `<div class="rp-head"><b>${ctx?.route ? `<a data-act="goctx">${esc(ctx.name)}</a>` : esc(ctx?.name || '지금 재생 중')}</b><span style="display:flex;gap:4px"><button data-act="nowmore" title="더보기">${ic('more')}</button>${closeBtn}</span></div>
     <div class="rp-body">
       <img class="np-art" src="${thumbBig(t.id)}" data-big="${esc(t.id)}" alt="">
       <div class="np-row"><div class="np-tx"><div class="np-t">${esc(m.title)}</div><div class="np-a">${artistLink(m.artist)}</div></div><button class="${liked ? 'on' : ''}" data-act="likecur" title="${liked ? '좋아요 취소' : '좋아요'}">${ic(liked ? 'check-circle' : 'add-circle')}</button></div>
@@ -2245,13 +2297,15 @@ function renderQueue() {
 }
 
 function renderNow() {
-  const t = current(), m = t && meta(t), liked = t && isLiked(t.id);
-  $('#now').innerHTML = t ? `
+  const t = current(), m = t && meta(t), liked = t && isLiked(t.id), nowEl = $('#now');
+  const sig = t ? [t.id, t.title, liked, isDisliked(t.id)].join('|') : '';
+  if (nowEl.dataset.sig !== sig || !t) nowEl.innerHTML = t ? `
     <img src="${thumb(t.id)}" alt="" data-act="panel" data-panel="now">
     <div class="tx"><div class="t1" data-act="nowtitle">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div>
     <button data-act="likecur" class="${liked ? 'liked-on' : ''}" title="${liked ? '좋아요 취소' : '좋아요'}">${ic(liked ? 'check-circle' : 'add-circle')}</button>
     <button data-act="dislikecur" class="${isDisliked(t.id) ? 'liked-on' : ''}" title="싫어요">${ic(isDisliked(t.id) ? 'thumb-down' : 'thumb-down-o')}</button>
     <button data-act="dlcur" title="MP3/MP4로 받기">${ic('download')}</button>` : '';
+  nowEl.dataset.sig = sig;
   const sh = $('#b-shuffle');
   sh.classList.toggle('on', !!store.shuffle);
   sh.classList.toggle('smart', !!store.shuffle && !!store.smart);
@@ -2749,7 +2803,7 @@ document.addEventListener('click', e => {
     case 'playradio': playRadio(id, el.dataset.label); break;
     case 'radio': go({ name: 'radio', id, label: el.dataset.label, sub: el.dataset.sub }); break;
     case 'artist': go({ name: 'artist', id }); break;
-    case 'like': toggleLike(lists[key][i], listKind(key)); break;
+    case 'like': if (key === 'liked') clearSel(); toggleLike(lists[key][i], listKind(key)); break;
     case 'likecur': if (current()) toggleLike(current()); break;
     case 'more': showMenu(el, key, i); break;
     case 'm-addto': showAddTo(el); break;
@@ -2777,7 +2831,7 @@ document.addEventListener('click', e => {
     case 'folderedit': { const f = folderById(id); if (f) { hideMenu(); editFolder(f); } break; }
     case 'pledit': { const p = plById(id); if (p) editPlaylist(p); break; }
     case 'plmore': showPlMenu(el, plById(id)); break;
-    case 'plrecs': { const p = plById(id); if (p) { loadRecs(p); renderMain(); } break; }
+    case 'plrecs': { const p = plById(id); if (p) loadRecs(p); break; }
     case 'ploffer': addToPlaylist(plById(id), lists[key][i]); break;
     case 'e-queue': menuThing.tracks.forEach(addToQueue); hideMenu(); break;
     case 'e-edit': hideMenu(); editPlaylist(menuThing); break;
@@ -2853,7 +2907,8 @@ document.addEventListener('click', e => {
     case 'panelclose': store.panel = ''; save(); renderRight(); break;
     case 'qtab': queueTab = id; renderQueue(); break;
     case 'lyrics': go(route.name === 'lyrics' ? lastRoute : { name: 'lyrics' }); break;
-    case 'lyricline': if (playerReady && current()) { player.seekTo(+el.dataset.t, true); tickLyrics(); } break;
+    case 'lyricline': if (playerReady && current()) { player.seekTo(Math.max(0, +el.dataset.t - shiftOf(current().id)), true); tickLyrics(); } break;
+    case 'lyricshift': nudgeLyrics(+id); break;
     case 'fs': openFs(!fsOpen); break;
     case 'mini': openMini(); break;
     case 'mute': toggleMute(); break;
@@ -3018,8 +3073,10 @@ function moveInQueue(from, to) {
 function applyWidths() {
   const L = store.lib, min = L.min || innerWidth < 760;
   $('#music').classList.toggle('lib-min', !!min);
-  $('#music').style.setProperty('--lw', (min ? 72 : clamp(L.w || 280, 240, 420)) + 'px');
-  $('#music').style.setProperty('--rw', clamp(store.settings.rightW || 300, 280, 420) + 'px');
+  // 폭을 직접 안 정했으면 창의 23% (280~420)
+  const auto = clamp(innerWidth * .23, 280, 420);
+  $('#music').style.setProperty('--lw', (min ? 72 : clamp(L.w || auto, 240, 420)) + 'px');
+  $('#music').style.setProperty('--rw', clamp(store.settings.rightW || auto, 280, 420) + 'px');
 }
 document.addEventListener('pointerdown', e => {
   const h = e.target.closest?.('[data-resize]');
@@ -3094,10 +3151,10 @@ document.addEventListener('submit', async e => {
   if (form === 'plfind') {
     const id = f.dataset.id, fd = finderOf(id), q = f.querySelector('input').value;
     Object.assign(fd, { q, results: [], loading: true, error: '' });
-    renderMain();
+    paintFinder(plById(id));
     try { fd.results = await search(q, { backup: false }); fd.error = ''; } catch (err) { fd.error = err.message; }
     fd.loading = false;
-    if (route.name === 'playlist' && route.id === id) renderMain();
+    paintFinder(plById(id));
   }
   if (form === 'friendname') {
     const v = f.querySelector('input').value.trim().slice(0, 20);
@@ -3108,6 +3165,7 @@ document.addEventListener('submit', async e => {
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.matches('[data-libq]')) { store.lib.q = t.value; renderLib(); }
+  if (t.closest('[data-form="plfind"]')) finderOf(t.closest('form').dataset.id).q = t.value;
   if (t.dataset.listq !== undefined) {
     viewOf(t.dataset.listq).q = t.value;
     clearSel(); renderMain();
@@ -3231,7 +3289,7 @@ function renderLyrics(el) {
   setHero(t.id, t.title);
   if (!d) { el.innerHTML = '<div class="lyr"><p class="past">가사를 찾는 중…</p></div>'; return; }
   if (d.lines.length) {
-    el.innerHTML = `<div class="lyr">${d.lines.map(l => `<p data-act="lyricline" data-t="${l.t}">${esc(l.x) || '…'}</p>`).join('')}<div class="lyr-note">가사 제공: LRCLIB</div></div>`;
+    el.innerHTML = `<div class="lyr"><div class="lyr-shift" title="뮤직비디오는 앞에 영상이 붙어서 가사가 어긋날 수 있어요"><button data-act="lyricshift" data-id="-0.5">늦추기</button><span>${shiftText(t.id)}</span><button data-act="lyricshift" data-id="0.5">앞당기기</button></div>${d.lines.map(l => `<p data-act="lyricline" data-t="${l.t}">${esc(l.x) || '…'}</p>`).join('')}<div class="lyr-note">가사 제공: LRCLIB</div></div>`;
     lyr.at = -2; tickLyrics();
   } else if (d.plain) {
     el.innerHTML = `<div class="lyr plain">${d.plain.split('\n').map(x => `<p>${esc(x) || '&nbsp;'}</p>`).join('')}<div class="lyr-note">이 곡은 시간이 맞춰진 가사가 없어요 · 가사 제공: LRCLIB</div></div>`;
@@ -3239,9 +3297,23 @@ function renderLyrics(el) {
     el.innerHTML = `<div class="lyr plain"><p>${d.failed ? '가사를 불러오지 못했어요' : '이 곡의 가사를 찾지 못했어요'}</p><div class="lyr-note">${esc(meta(t).artist)} · ${esc(meta(t).title)}</div></div>`;
   }
 }
+// 곡마다 가사 시간을 앞뒤로 옮긴 양(초). 양수면 가사가 먼저 나온다
+const shiftOf = id => store.lyricShift[id] || 0;
+const shiftText = id => { const v = shiftOf(id); return v ? `${v > 0 ? '+' : ''}${v}초` : '가사 시간'; };
+function nudgeLyrics(d) {
+  const t = current();
+  if (!t) return;
+  const v = Math.round((shiftOf(t.id) + d) * 10) / 10;
+  if (v) store.lyricShift[t.id] = v; else delete store.lyricShift[t.id];
+  const ks = Object.keys(store.lyricShift);
+  if (ks.length > 300) delete store.lyricShift[ks[0]];
+  save();
+  $('#main .lyr-shift span').textContent = shiftText(t.id);
+  lyr.at = -2; tickLyrics();
+}
 function tickLyrics() {
   if (route.name !== 'lyrics' || !lyr.data?.lines.length || mode !== 'music') return;
-  const i = lineAt(lyr.data.lines, curTime() + .25);
+  const i = lineAt(lyr.data.lines, curTime() + .25 + shiftOf(lyr.id));
   if (i === lyr.at) return;
   lyr.at = i;
   const ps = document.querySelectorAll('#main .lyr p');
@@ -3313,7 +3385,7 @@ $('#q-input').addEventListener('keydown', async e => {
 
 // ---------- 단축키 ----------
 window.addEventListener('keydown', e => {
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  const typing = (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== 'range') || e.target.isContentEditable;
   if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyM') { e.preventDefault(); setMode(mode === 'music' ? 'doc' : 'music'); return; }
   if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.code === 'KeyJ') { e.preventDefault(); toggleQuick(); return; }
   if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyK') { e.preventDefault(); panic(); return; }
