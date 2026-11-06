@@ -1202,7 +1202,12 @@ function fillMissingTitle() {
   const t = Q.list[Q.i];
   if (!t || t.title !== t.id) return;
   const d = player.getVideoData && player.getVideoData();
-  if (d && d.title) { t.title = d.title; t.channel = d.author || ''; renderAll(); }
+  if (!d || !d.title) return;
+  const s = Math.round(player.getDuration?.() || 0);
+  Object.assign(t, { title: d.title, channel: d.author || '' }, s ? { seconds: s, duration: fmt(s) } : {});
+  // 검색 결과와 최근 재생에 들어 있는 같은 곡도 고친다 (저장된 건 ID가 제목으로 남아 있다)
+  for (const x of [...searchState.results, ...store.recent, ...store.video.recent]) if (x.id === t.id) Object.assign(x, slim(t));
+  save(); renderAll();
 }
 
 const setSpeedQuiet = () => { try { player.setPlaybackRate && player.setPlaybackRate(store.settings.speed); } catch (e) {} };
@@ -1751,7 +1756,6 @@ function go(r, nav) {
   renderMain();
   renderLib();
   $('#main').scrollTop = nav ? r.y || 0 : 0;
-  if (r.name === 'search') { const i = $('#m-q'); if (document.activeElement !== i) { i.focus(); i.select(); } }
   onKindChange();
   if (mode === 'music') renderNow();
 }
@@ -2007,7 +2011,7 @@ function renderSearch(el) {
   else if (searchTab === 'artists') { lists.search = res; body = `<div class="gridall">${artists.map(cardArtist).join('')}</div>`; }
   else {
     const t = res[0], m = meta(t), rows = trackTable('search', res, { head: false, limit: 4, raw: true });
-    body = `<div class="sres"><section><h2>상위 결과</h2><div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="t1">${esc(m.title)}</div><div class="t2">곡 · ${esc(m.artist)}</div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div></section><section><h2>곡</h2>${rows}</section></div>
+    body = `<div class="sres"><section><h2>상위 결과</h2><div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(m.artist)}` : ''}</div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div></section><section><h2>곡</h2>${rows}</section></div>
       ${artists.length ? shelf('아티스트', artists.slice(0, 12).map(cardArtist).join('')) : ''}
       ${res.length > 4 ? `<section class="shelf"><div class="shelf-h"><h2>더 많은 곡</h2></div><div class="row1">${res.slice(4, 16).map((x, i) => cardTrack('search', x, i + 4)).join('')}</div></section>` : ''}`;
   }
@@ -2859,7 +2863,10 @@ document.addEventListener('click', e => {
   }
   const a = el.dataset.act, key = el.dataset.list, i = +el.dataset.i, id = el.dataset.id;
   switch (a) {
-    case 'go': go({ name: el.dataset.route, id: id || undefined }); break;
+    case 'go':
+      go({ name: el.dataset.route, id: id || undefined });
+      if (el.dataset.route === 'search') { $('#m-q').focus(); $('#m-q').select(); } // 뒤로 가기나 영상 닫기로 돌아올 때는 키를 뺏지 않는다
+      break;
     case 'goctx': if (Q.ctx?.route) go(Q.ctx.route); break;
     case 'histback': histGo(-1); break;
     case 'histfwd': histGo(1); break;
