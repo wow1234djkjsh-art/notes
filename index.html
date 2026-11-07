@@ -334,15 +334,15 @@
   @container (max-width: 700px) { .sres { grid-template-columns: minmax(0, 1fr); } }
 
   /* 머리 영역 + 표 */
-  .hero { position: relative; display: flex; gap: 24px; align-items: flex-end; padding: 24px; min-height: clamp(276px, 30vh, 340px); background: linear-gradient(transparent, rgba(0,0,0,.5)), var(--hc); transition: background-color .5s; }
-  .hero .art { width: clamp(128px, 18cqw, 232px); aspect-ratio: 1; border-radius: 4px; flex: none; object-fit: cover; box-shadow: 0 4px 60px rgba(0,0,0,.5); background: #282828; display: grid; place-items: center; overflow: hidden; }
+  .hero { position: relative; display: flex; gap: 24px; align-items: flex-end; padding: 24px; min-height: clamp(240px, 25.2cqw, 312px); background: linear-gradient(transparent, rgba(0,0,0,.5)), var(--hc); transition: background-color .5s; }
+  .hero .art { width: clamp(128px, 19cqw, 232px); aspect-ratio: 1; border-radius: 4px; flex: none; object-fit: cover; box-shadow: 0 4px 60px rgba(0,0,0,.5); background: #282828; display: grid; place-items: center; overflow: hidden; }
   .hero .art .mi { width: 40%; height: 40%; color: #7f7f7f; }
   .hero .art.grad .mi { color: #fff; }
   .hero button.art { padding: 0; cursor: pointer; }
   .hero.round .art { border-radius: 50%; }
   .hero-t { min-width: 0; flex: 1; }
   .hero-type { font-size: 14px; }
-  .hero h1 { font-size: clamp(32px, 7cqw, 88px); font-weight: 900; letter-spacing: -.03em; line-height: 1.08; margin: 8px 0 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+  .hero h1 { font-size: clamp(32px, 7.8cqw, 96px); font-weight: 800; letter-spacing: -.03em; line-height: 1.08; margin: 8px 0 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
   .hero h1.edit { cursor: pointer; }
   .hero-desc { color: rgba(255,255,255,.7); font-size: 14px; margin-bottom: 6px; }
   .hero-sub { font-size: 14px; color: rgba(255,255,255,.9); }
@@ -372,9 +372,12 @@
   .stick.on { opacity: 1; pointer-events: auto; }
   .stick-t { font-size: 24px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tbl { padding: 0 24px 16px; }
-  .thead, .trk[data-row] { display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, .5fr) 120px; gap: 16px; padding: 0 16px; align-items: center; }
-  .tbl.nodate .thead, .tbl.nodate .trk[data-row] { grid-template-columns: 16px minmax(0, 1fr) 120px; }
-  .tbl.nodate .c-date { display: none; }
+  /* 열은 표마다 켜고 끈다: 비어 있는 변수는 그 열이 없다는 뜻 */
+  .tbl { --c-art: ; --c-alb: minmax(0, 2fr); --c-date: minmax(0, 2fr); }
+  .tbl.compact { --c-art: minmax(0, 2fr); }
+  .tbl.noalb { --c-alb: ; }
+  .tbl.nodate { --c-date: ; }
+  .thead, .trk[data-row] { display: grid; grid-template-columns: 16px minmax(0, 4fr) var(--c-art) var(--c-alb) var(--c-date) minmax(120px, 1fr); gap: 16px; padding: 0 16px; align-items: center; }
   .thead { height: 36px; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 16px; color: var(--sub); font-size: 14px; position: sticky; top: 64px; z-index: 3; }
   .thead button { color: var(--sub); text-align: left; display: flex; gap: 4px; align-items: center; font-size: 14px; padding: 0; }
   .thead button:hover, .thead button.on { color: #fff; }
@@ -410,7 +413,9 @@
   .trk .t2 { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
   .trk .t2 a:hover { color: #fff; text-decoration: underline; }
   .trk:hover .t2, .trk:hover .c-date, .trk:hover .c-dur { color: #fff; }
-  .c-date { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-date, .c-alb, .c-art { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .c-alb a:hover, .c-art a:hover { color: #fff; text-decoration: underline; }
+  .trk:hover .c-alb, .trk:hover .c-art { color: #fff; }
   .tail { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
   .c-dur { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
   .trk button.like, .trk button.more { color: var(--sub); width: 24px; height: 24px; display: grid; place-items: center; opacity: 0; flex: none; }
@@ -421,11 +426,19 @@
   .tbl.compact .trk[data-row] { height: 32px; }
   .tbl.compact .trk img { display: none; }
   .tbl.compact .tt { display: grid; grid-template-columns: minmax(0, 1fr); }
-  .tbl.compact .tx { display: flex; gap: 12px; align-items: baseline; }
-  .tbl.compact .t1 { font-size: 14px; flex: none; max-width: 60%; }
+  .tbl.compact .t1 { font-size: 14px; }
+  .tbl.compact .t2 { display: none; }
+  @container (max-width: 760px) {
+    .tbl:not(.noalb) { --c-date: ; }
+    .tbl:not(.noalb) .c-date { display: none; }
+  }
   @container (max-width: 620px) {
-    .thead, .trk[data-row] { grid-template-columns: 16px minmax(0, 1fr) 120px; }
+    .tbl { --c-date: ; }
     .c-date { display: none; }
+  }
+  @container (max-width: 560px) {
+    .tbl { --c-alb: ; }
+    .c-alb { display: none; }
     .hero { gap: 16px; }
   }
   .sec { padding: 8px 24px 24px; }
@@ -433,11 +446,18 @@
   .sec .tbl { padding: 0; }
   .showmore { color: var(--sub); font-weight: 700; font-size: 14px; padding: 16px; }
   .showmore:hover { color: #fff; }
-  .finder { border-top: 1px solid rgba(255,255,255,.1); margin: 16px 24px 0; padding: 24px 0 8px; }
+  .pl-tools { display: flex; gap: 8px; padding: 0 24px 16px; flex-wrap: wrap; }
+  .find-more-row { display: flex; justify-content: flex-end; padding: 0 24px; }
+  .find-more { color: #fff; font-size: 14px; font-weight: 700; height: 32px; }
+  .find-more:hover { transform: scale(1.04); }
+  .finder { margin: 16px 24px 0; padding: 8px 0; position: relative; }
+  .find-box { border-top: 1px solid rgba(255,255,255,.1); padding-top: 24px; position: relative; }
+  .find-x { position: absolute; right: 0; top: 24px; color: var(--sub); width: 32px; height: 32px; display: grid; place-items: center; }
+  .find-x:hover { color: #fff; }
   .finder h2 { font-size: 24px; font-weight: 700; margin-bottom: 16px; }
-  .finder form { display: flex; align-items: center; gap: 8px; background: var(--el2); border-radius: 4px; padding: 0 12px; height: 40px; max-width: 360px; margin-bottom: 16px; color: var(--sub); }
+  .finder form { display: flex; align-items: center; gap: 8px; background: var(--el2); border-radius: 4px; padding: 0 12px; height: 40px; max-width: 387px; margin-bottom: 16px; color: var(--sub); }
   .finder input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: #fff; font-family: inherit; font-size: 14px; }
-  .offer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 8px 16px; border-radius: 4px; }
+  .offer { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 2fr) auto; gap: 16px; align-items: center; padding: 8px 16px; border-radius: 4px; color: var(--sub); }
   .offer:hover { background: var(--hov); }
 
   /* 재생 중 패널, 대기열, 친구 */
@@ -479,7 +499,7 @@
   .q-sec h4 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .q-sec button { color: var(--sub); font-size: 13px; font-weight: 700; flex: none; }
   .q-sec button:hover { color: #fff; }
-  .m-queue .trk { display: grid; grid-template-columns: 48px minmax(0, 1fr) 24px; gap: 12px; align-items: center; padding: 6px 8px; margin: 0 -8px; cursor: pointer; }
+  .m-queue .trk { display: grid; grid-template-columns: 48px minmax(0, 1fr) 24px; gap: 12px; align-items: center; height: 64px; padding: 0 8px; margin: 0 -8px; cursor: pointer; }
   .m-queue .trk:hover { background: var(--hov); }
   .m-queue .trk img { width: 48px; height: 48px; }
   .m-queue .trk > button { color: var(--sub); width: 24px; height: 24px; display: grid; place-items: center; opacity: 0; }
@@ -570,6 +590,8 @@
   .now button:hover { color: #fff; transform: scale(1.04); }
   .now button .mi { width: 18px; height: 18px; }
   .now button.liked-on { color: var(--acc); }
+  .now button[data-act="dislikecur"], .now button[data-act="dlcur"] { opacity: 0; transition: opacity .1s; }
+  .now:hover button, .now button:focus-visible, .now button.liked-on { opacity: 1; }
   .ctl { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
   .ctl-btns { display: flex; align-items: center; gap: 8px; }
   .ctl-btns button { color: var(--sub); position: relative; width: 32px; height: 32px; display: grid; place-items: center; }
@@ -587,12 +609,13 @@
   #music input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--f) var(--p, 0%), #4d4d4d var(--p, 0%)); }
   #music input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; opacity: 0; box-shadow: 0 2px 4px rgba(0,0,0,.5); }
   #music input[type=range]:hover::-webkit-slider-thumb { opacity: 1; }
-  .right { display: flex; justify-content: flex-end; align-items: center; gap: 4px; color: var(--sub); padding-right: 8px; min-width: 0; }
-  .right button { position: relative; width: 32px; height: 32px; display: grid; place-items: center; color: var(--sub); flex: none; }
+  .right { display: flex; justify-content: flex-end; align-items: center; gap: 4px; color: rgba(255,255,255,.7); padding-right: 8px; min-width: 0; }
+  .right button { position: relative; width: 32px; height: 32px; display: grid; place-items: center; color: rgba(255,255,255,.7); flex: none; }
+  .right button[hidden] { display: none; }
   .right button .mi { width: 18px; height: 18px; }
   .right button:hover { color: #fff; transform: scale(1.04); }
   .right button.on { color: var(--acc); }
-  .right input[type=range] { max-width: 110px; flex: 0 1 110px !important; }
+  .right input[type=range] { max-width: 89px; flex: 0 1 89px !important; }
   @media (max-width: 1180px) { .right .opt { display: none; } }
   @media (max-width: 1000px) {
     #music, #music.no-right { grid-template-columns: var(--lw) minmax(0, 1fr); }
@@ -681,7 +704,7 @@
   #menu hr, #menu2 hr { border: 0; border-top: 1px solid rgba(255,255,255,.1); margin: 0; }
   #menu .m-cap { color: #b3b3b3; font-size: 12px; font-weight: 700; margin: 0; padding: 10px 12px 6px; }
   #toast { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); background: #323232; color: #fff; padding: 9px 16px; border-radius: 6px; font-size: 13px; z-index: 90; pointer-events: none; }
-  #music:not([hidden]) ~ #toast { background: #2e77d0; border-radius: 8px; padding: 12px 24px; font-size: 14px; font-family: Figtree, "Noto Sans KR", "Malgun Gothic", sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+  #music:not([hidden]) ~ #toast { background: #fff; color: #000; border-radius: 4px; padding: 8px 12px; font-size: 14px; font-family: Figtree, "Noto Sans KR", "Malgun Gothic", sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   #music ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 5px; }
 </style>
@@ -758,12 +781,11 @@
       <div class="seek"><span id="t-cur">0:00</span><input type="range" id="seek" min="0" max="1000" value="0"><span id="t-dur">0:00</span></div>
     </div>
     <div class="right">
-      <button data-act="panel" data-panel="now" id="b-now" title="지금 재생 중 보기"><svg class="mi" aria-hidden="true"><use href="#m-nowview"/></svg></button>
       <button data-act="lyrics" id="b-lyrics" title="가사 (L)"><svg class="mi" aria-hidden="true"><use href="#m-mic"/></svg></button>
       <button data-act="panel" data-panel="queue" id="b-queue" title="대기열 (Q)"><svg class="mi" aria-hidden="true"><use href="#m-queue"/></svg></button>
       <button data-act="video" id="b-video" title="영상 (V)"><svg class="mi" aria-hidden="true"><use href="#m-video"/></svg></button>
-      <button class="opt" data-act="sleepmenu" id="b-sleep" title="수면 타이머"><svg class="mi" aria-hidden="true"><use href="#m-moon"/></svg></button>
-      <button class="opt" data-act="speedmenu" id="b-speed" title="재생 속도"><svg class="mi" aria-hidden="true"><use href="#m-speed"/></svg></button>
+      <button class="opt" data-act="sleepmenu" id="b-sleep" title="수면 타이머" hidden><svg class="mi" aria-hidden="true"><use href="#m-moon"/></svg></button>
+      <button class="opt" data-act="speedmenu" id="b-speed" title="재생 속도" hidden><svg class="mi" aria-hidden="true"><use href="#m-speed"/></svg></button>
       <button data-act="mute" id="b-mute" title="음소거 (M)"><svg class="mi" aria-hidden="true"><use href="#m-volume"/></svg></button><input type="range" id="vol" min="0" max="100">
       <button class="opt" data-act="mini" title="미니 플레이어"><svg class="mi" aria-hidden="true"><use href="#m-pip"/></svg></button>
       <button class="opt" data-act="fs" title="전체 화면 (F)"><svg class="mi" aria-hidden="true"><use href="#m-fullscreen"/></svg></button>
@@ -830,7 +852,7 @@ const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s /
 // ---------- 저장소 ----------
 const KEY = 'sm.v1';
 const STORE_MAX = 4500000; // 브라우저 저장 공간은 글자 약 500만 개
-const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, smart: false, panel: 'now', doc: null, settings: {}, following: [], folders: [], searches: [], pins: ['liked'], played: {}, lib: {}, lyricShift: {}, lyricPick: {} });
+const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, smart: false, panel: 'now', doc: null, settings: {}, following: [], folders: [], searches: [], pins: ['liked'], played: {}, lib: {}, lyricShift: {}, lyricPick: {}, albums: {}, noArtist: [] });
 // 이 브라우저에 저장된 게 하나도 없으면 처음 온 사람 (첫 방문 안내용)
 const FIRST_VISIT = (() => { try { return !localStorage.getItem(KEY); } catch (e) { return false; } })();
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
@@ -1605,6 +1627,8 @@ const autoplayOn = () => store.settings.autoplay !== false;
 // 검색에서 시작했으면 전체 반복이어도 추천을 계속한다
 const useAuto = () => autoplayOn() && (Q.source === 'search' || store.repeat !== 'all');
 const smartOn = () => !!store.shuffle && !!store.smart;
+// '이 아티스트 재생 안 함': 자동 추천에서만 뺀다. 내가 직접 고른 곡과 재생목록은 그대로 재생한다
+const artistBlocked = t => store.noArtist.some(n => sameArtist(meta(t).artist, n));
 // 자동 추천 켜기/끄기나 반복 모드가 바뀌면: 더는 안 쓸 추천은 버리고, 쓸 수 있게 되면 다시 채운다
 function autoSettingChanged() {
   if (useAuto()) refillAuto(); else { Q.auto = []; Q.autoEpoch++; }
@@ -1665,7 +1689,8 @@ function refillAuto() {
       if (lastHeard) mix = mix.concat(await fetchMix(lastHeard.t.id));
     }
     if (token !== autoToken() || !(useAuto() || smartOn())) return;
-    const pools = { mine, mix: weigh(mix, idx), taste: weigh(taste, idx), popular: weigh(popular, idx) };
+    const open = l => l.filter(x => !artistBlocked(x.t));
+    const pools = { mine: open(mine), mix: open(weigh(mix, idx)), taste: open(weigh(taste, idx)), popular: open(weigh(popular, idx)) };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
       if (!p) break;
@@ -1931,15 +1956,16 @@ function setHero(id, seed) {
 const views = {};
 const viewOf = key => views[key] || (views[key] = { by: '', dir: 1, q: '', find: false });
 function viewList(key, arr) {
-  const v = viewOf(key), q = v.q.trim().toLowerCase(), out = sortTracks(arr, v.by, v.dir);
+  const v = viewOf(key), q = v.q.trim().toLowerCase(), out = v.by === 'album' ? arr.slice().sort((a, b) => v.dir * COLLATE.compare(albumName(a), albumName(b))) : sortTracks(arr, v.by, v.dir);
   return q ? out.filter(t => { const m = meta(t); return (m.title + ' ' + m.artist).toLowerCase().includes(q); }) : out;
 }
+const albumName = t => store.albums[t.id]?.n || '';
 function trackRow(key, t, i, o) {
   const m = meta(t), k = esc(key), on = isLiked(t.id, listKind(key));
   return `<div class="trk${isCur(t) ? ' cur' : ''}" data-row data-id="${esc(t.id)}" data-list="${k}" data-i="${i}" draggable="true">
     <span class="n"><span class="num">${i + 1}</span><button class="rp" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>
     <div class="tt"><img src="${thumb(t.id)}" loading="lazy" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div>
-    <span class="c-date">${o.date ? esc(dateText(t.at)) : ''}</span>
+    ${store.settings.compact ? `<span class="c-art">${artistLink(m.artist)}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${esc(albumName(t))}</span>`}${o.date ? `<span class="c-date">${esc(dateText(t.at))}</span>` : ''}
     <div class="tail"><button class="like${on ? ' on' : ''}" data-act="like" data-list="${k}" data-i="${i}" title="${on ? '좋아요 취소' : '좋아요'}">${ic(on ? 'check-circle' : 'add-circle')}</button><span class="c-dur">${esc(t.duration || '')}</span><button class="more" data-act="more" data-list="${k}" data-i="${i}" title="더보기">${ic('more')}</button></div>
   </div>`;
 }
@@ -1947,10 +1973,11 @@ function trackTable(key, arr, o = {}) {
   const list = o.raw ? arr : viewList(key, arr), v = viewOf(key);
   lists[key] = list;
   if (!list.length) return `<div class="tbl"><p class="m-hint">${v.q ? '찾는 곡이 없어요' : o.empty || '곡이 없어요'}</p></div>`;
+  o = { ...o, album: o.album !== false && list.some(albumName) };
   const col = (by, label) => `<button class="${v.by === by ? 'on' : ''}" data-act="sortcol" data-list="${esc(key)}" data-col="${by}">${label}${v.by === by ? ic(v.dir > 0 ? 'up' : 'down') : ''}</button>`;
-  const head = o.head === false ? '' : `<div class="thead"><span class="n">#</span>${col('title', '제목')}${o.date ? `<span class="c-date">${col('added', '추가한 날짜')}</span>` : ''}<span class="tail">${ic('clock')}</span></div>`;
+  const head = o.head === false ? '' : `<div class="thead"><span class="n">#</span>${col('title', '제목')}${store.settings.compact ? `<span class="c-art">${col('artist', '아티스트')}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${col('album', '앨범')}</span>`}${o.date ? `<span class="c-date">${col('added', '추가한 날짜')}</span>` : ''}<span class="tail">${ic('clock')}</span></div>`;
   const rows = (o.limit ? list.slice(0, o.limit) : list).map((t, i) => trackRow(key, t, i, o)).join('');
-  return `<div class="tbl${o.date ? '' : ' nodate'}${store.settings.compact ? ' compact' : ''}">${head}${rows}</div>`;
+  return `<div class="tbl${o.date ? '' : ' nodate'}${o.album === false ? ' noalb' : ''}${store.settings.compact ? ' compact' : ''}">${head}${rows}</div>`;
 }
 const stickBar = (title, key) => `<div class="stick"><button class="bigplay sm" data-act="playall" data-list="${esc(key)}" title="재생">${ic('play')}</button><span class="stick-t">${esc(title)}</span></div>`;
 const listFindBtn = key => `<button data-act="listfind" data-list="${esc(key)}" title="이 목록에서 찾기">${ic('search')}</button>`;
@@ -1964,7 +1991,7 @@ function actBar(key, o = {}) {
     ${o.more ? `<button class="ab" data-act="${o.more}" data-id="${esc(o.id ?? '')}" title="더보기">${ic('more')}</button>` : ''}
     <div class="act-r">
       ${o.find === false ? '' : v.find ? `<div class="act-find">${ic('search')}<input data-listq="${esc(key)}" value="${esc(v.q)}" placeholder="이 목록에서 찾기" spellcheck="false"></div>` : listFindBtn(key)}
-      <button data-act="compact" title="보기 방식">${store.settings.compact ? '간략히' : '목록'}${ic(store.settings.compact ? 'menu' : 'bullet')}</button>
+      <button data-act="viewmenu" title="보기 설정">${store.settings.compact ? '작게' : '목록'}${ic(store.settings.compact ? 'menu' : 'bullet')}</button>
     </div>
   </div>`;
 }
@@ -2095,11 +2122,11 @@ function renderLiked(el, r) {
 }
 
 // 플레이리스트에 곡 찾아 넣기
-const finders = {}, plRecs = {};
+const finders = {}, plRecs = {}, finderOpen = new Set();
 const finderOf = id => finders[id] || (finders[id] = { q: '', results: [], loading: false, error: '' });
 function offerRows(key, arr, id) {
   lists[key] = arr;
-  return arr.map((t, i) => { const m = meta(t); return `<div class="offer"><div class="trk" style="min-width:0"><div class="tt"><img src="${thumb(t.id)}" loading="lazy" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div></div><button class="pill" data-act="ploffer" data-list="${esc(key)}" data-i="${i}" data-id="${id}">추가</button></div>`; }).join('');
+  return arr.map((t, i) => { const m = meta(t); return `<div class="offer"><div class="trk" style="min-width:0"><div class="tt"><img src="${thumb(t.id)}" loading="lazy" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div></div><span class="c-alb">${esc(albumName(t))}</span><button class="pill" data-act="ploffer" data-list="${esc(key)}" data-i="${i}" data-id="${id}">추가하기</button></div>`; }).join('');
 }
 function loadRecs(p) {
   const seed = p.tracks[Math.floor(Math.random() * p.tracks.length)];
@@ -2113,7 +2140,7 @@ function finderResults(p) {
 }
 function finderRecs(p) {
   const have = new Set(p.tracks.map(t => t.id)), recs = (plRecs[p.id]?.list || []).filter(t => !have.has(t.id)).slice(0, 10);
-  return recs.length ? `<div class="shelf-h" style="margin-top:24px"><h2>추천</h2><a class="more" data-act="plrecs" data-id="${p.id}">새로고침</a></div><p class="m-hint" style="margin:0 0 8px">이 플레이리스트의 곡을 바탕으로</p>${offerRows('rec:' + p.id, recs, p.id)}` : '';
+  return recs.length ? `<div class="shelf-h" style="margin-top:24px"><h2>추천</h2><a class="more" data-act="plrecs" data-id="${p.id}">새로 고침</a></div><p class="m-hint" style="margin:0 0 8px">이 플레이리스트에 있는 곡 기준</p>${offerRows('rec:' + p.id, recs, p.id)}` : '';
 }
 // 결과가 늦게 와도 이 칸만 바꾼다 (화면 전체를 다시 그리면 입력 중인 글자가 지워진다)
 function paintFinder(p) {
@@ -2124,10 +2151,12 @@ function paintFinder(p) {
 }
 function finderHtml(p) {
   if (p.tracks.length && !plRecs[p.id]) loadRecs(p);
-  return `<div class="finder">
-    <h2>이 플레이리스트에 추가할 곡을 찾아볼까요?</h2>
+  // 곡이 있으면 평소엔 접어 두고, 비어 있으면 처음부터 연다
+  const open = finderOpen.has(p.id) || !p.tracks.length;
+  return `${open ? '' : `<div class="find-more-row"><button class="find-more" data-act="plfindopen" data-id="${p.id}">더 찾아보기</button></div>`}<div class="finder">
+    ${open ? `<div class="find-box"><h2>추가할 곡을 찾아보세요</h2>${p.tracks.length ? `<button class="find-x" data-act="plfindclose" data-id="${p.id}" title="닫기">${ic('close')}</button>` : ''}
     <form data-form="plfind" data-id="${p.id}">${ic('search')}<input value="${esc(finderOf(p.id).q)}" placeholder="곡 검색" autocomplete="off" spellcheck="false"></form>
-    <div id="f-res">${finderResults(p)}</div><div id="f-rec">${finderRecs(p)}</div>
+    <div id="f-res">${finderResults(p)}</div></div>` : ''}<div id="f-rec">${finderRecs(p)}</div>
   </div>`;
 }
 function renderPlaylist(el, r) {
@@ -2137,7 +2166,7 @@ function renderPlaylist(el, r) {
   el.innerHTML = stickBar(p.name, key) + `
     <div class="hero"><button class="art" data-act="pledit" data-id="${p.id}" title="세부 정보 수정">${plArt(p, 'art')}</button>
       <div class="hero-t"><div class="hero-type">플레이리스트</div><h1 class="edit" data-act="pledit" data-id="${p.id}">${esc(p.name)}</h1>${p.desc ? `<div class="hero-desc">${esc(p.desc)}</div>` : ''}<div class="hero-sub"><b>${esc(myName())}</b> • ${p.tracks.length}곡${total ? `, ${longTime(total)}` : ''}</div></div></div>
-    <div class="below">${actBar(key, { more: 'plmore', id: p.id })}${trackTable(key, p.tracks, { date: true, empty: '아래에서 곡을 찾아 넣어 보세요' })}</div>${finderHtml(p)}`;
+    <div class="below">${actBar(key, { more: 'plmore', id: p.id })}<div class="pl-tools"><button class="pill" data-act="plfindopen" data-id="${p.id}">${ic('add')}추가</button><button class="pill" data-act="pledit" data-id="${p.id}">${ic('edit')}이름 및 세부 정보</button></div>${trackTable(key, p.tracks, { date: true, empty: '아래에서 곡을 찾아 넣어 보세요' })}</div>${finderHtml(p)}`;
   setHero(p.tracks[0]?.id, p.name);
 }
 function renderFolder(el, r) {
@@ -2183,8 +2212,8 @@ function renderArtist(el, r) {
   el.innerHTML = stickBar(name, key) + `
     <div class="hero artist" ${seed ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${thumbBig(seed.id)})"` : ''}><div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(name)}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
     <div class="below">${actBar(key, { more: 'armore', id: name, find: false, extra: `<button class="pill" data-act="follow" data-id="${esc(name)}">${following ? '팔로잉' : '팔로우하기'}</button>` })}
-    <div class="sec"><h2>인기</h2>${d ? trackTable(key, top, { head: false, limit: more ? 20 : 5, empty: '이 아티스트의 곡을 찾지 못했어요' }) : '<p class="m-hint">불러오는 중…</p>'}${d && top.length > 5 ? `<button class="showmore" data-act="armoretoggle" data-id="${esc(name)}">${more ? '간단히 보기' : '자세히 보기'}</button>` : ''}</div>
-    ${mine.length ? `<div class="sec"><h2>내가 들은 곡</h2>${trackTable('mine:' + name, mine, { head: false, limit: 5 })}</div>` : ''}
+    <div class="sec"><h2>인기</h2>${d ? trackTable(key, top, { head: false, album: false, limit: more ? 20 : 5, empty: '이 아티스트의 곡을 찾지 못했어요' }) : '<p class="m-hint">불러오는 중…</p>'}${d && top.length > 5 ? `<button class="showmore" data-act="armoretoggle" data-id="${esc(name)}">${more ? '간단히 보기' : '자세히 보기'}</button>` : ''}</div>
+    ${mine.length ? `<div class="sec"><h2>내가 들은 곡</h2>${trackTable('mine:' + name, mine, { head: false, album: false, limit: 5 })}</div>` : ''}
     ${like.length ? `<div class="sec">${shelf('비슷한 아티스트', like.slice(0, 12).map(cardArtist).join(''))}</div>` : ''}</div>`;
   setHero(seed?.id, name);
 }
@@ -2210,7 +2239,7 @@ function renderMe(el) {
     <div class="below"><div class="actbar"><button class="ab" data-act="memenu" title="더보기">${ic('more')}</button></div>
     <div class="kpis"><div><b>${plays}</b>번 들음</div><div><b>${secs ? longTime(secs) : '0분'}</b>들은 시간</div><div><b>${s.length}</b>곡을 들음</div><div><b>${store.liked.length}</b>좋아요</div></div>
     ${ars.length ? `<div class="sec">${shelf(label + '많이 들은 아티스트', ars.map(cardArtist).join(''))}</div>` : ''}
-    ${top.length ? `<div class="sec"><h2>${label}많이 들은 곡</h2>${trackTable('metop', top, { head: false })}</div>` : ''}
+    ${top.length ? `<div class="sec"><h2>${label}많이 들은 곡</h2>${trackTable('metop', top, { head: false, album: false })}</div>` : ''}
     ${store.following.length ? `<div class="sec">${shelf('팔로잉', store.following.map(cardArtist).join(''))}</div>` : ''}
     ${store.playlists.length ? `<div class="sec">${shelf('내 플레이리스트', store.playlists.map(cardPlaylist).join(''))}</div>` : ''}</div>`;
   setHero(top[0]?.id, myName());
@@ -2357,7 +2386,6 @@ function renderRight() {
   $('#queue').hidden = p !== 'queue';
   $('#friends').hidden = p !== 'friends';
   $('#music').classList.toggle('no-right', !p);
-  $('#b-now').classList.toggle('on', p === 'now');
   $('#b-queue').classList.toggle('on', p === 'queue');
   $('#b-friends').classList.toggle('on', p === 'friends');
   applyWidths();
@@ -2387,7 +2415,7 @@ function renderNowView() {
       <div class="np-card" id="np-lyr" hidden><h4>가사<a data-act="lyrics">더 보기</a></h4><div class="np-lines"></div></div>
       ${m.artist ? `<div class="np-card"><h4>아티스트 정보</h4><div class="np-artist"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1"><a data-act="artist" data-id="${esc(m.artist)}">${esc(m.artist)}</a></div><div class="t2">아티스트</div></div><button class="pill" data-act="follow" data-id="${esc(m.artist)}">${isFollowing(m.artist) ? '팔로잉' : '팔로우하기'}</button></div></div>` : ''}
       <div class="np-card"><h4>곡 정보</h4><div class="np-kv"><span>채널</span><b>${esc(t.channel || '-')}</b></div><div class="np-kv"><span>길이</span><b>${esc(t.duration || fmt(t.seconds))}</b></div><div class="np-kv"><span>내가 들은 횟수</span><b>${s ? s.plays : 0}번</b></div></div>
-      <div class="np-card"><h4>다음 대기열<a data-act="panel" data-panel="queue">대기열 열기</a></h4>${n ? `<div class="np-artist" style="cursor:pointer" data-act="next"><img src="${thumb(n.id)}" alt="" style="border-radius:4px;width:48px;height:48px"><div class="tx"><div class="t1" style="font-weight:400">${esc(meta(n).title)}</div><div class="t2">${esc(meta(n).artist)}</div></div></div>` : '<p class="m-hint" style="margin:0">다음 곡이 없어요</p>'}</div>
+      <div class="np-card"><h4>다음 재생 항목<a data-act="panel" data-panel="queue">재생목록 열기</a></h4>${n ? `<div class="np-artist" style="cursor:pointer" data-act="next"><img src="${thumb(n.id)}" alt="" style="border-radius:4px;width:48px;height:48px"><div class="tx"><div class="t1" style="font-weight:400">${esc(meta(n).title)}</div><div class="t2">${esc(meta(n).artist)}</div></div></div>` : '<p class="m-hint" style="margin:0">다음 곡이 없어요</p>'}</div>
     </div>`;
   fetchLyrics(t).then(d => {
     const box = $('#np-lyr'), lines = (d.lines.length ? d.lines.map(l => l.x) : d.plain.split('\n')).filter(Boolean).slice(0, 4);
@@ -2396,29 +2424,22 @@ function renderNowView() {
     box.hidden = false;
   });
 }
-let queueTab = 'queue';
 function queueRow(t, k, act, x) {
   const m = meta(t);
   return `<div class="trk" data-act="${act}" data-i="${k}" ${x || ''}><img src="${thumb(t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${esc(m.artist)}</div></div>`;
 }
 function renderQueue() {
   if (mode !== 'music') return;
-  const cur = current(), head = `<div class="rp-tabs"><button class="${queueTab === 'queue' ? 'on' : ''}" data-act="qtab" data-id="queue">대기열</button><button class="${queueTab === 'recent' ? 'on' : ''}" data-act="qtab" data-id="recent">최근 재생</button><button class="x" data-act="panelclose" title="닫기">${ic('close')}</button></div>`;
+  const cur = current(), head = `<div class="rp-head"><b>재생목록</b><button data-act="panelclose" title="닫기">${ic('close')}</button></div>`;
   lists.queue = Q.list;
-  if (queueTab === 'recent') {
-    const rec = bucket().recent.slice(0, 30);
-    lists.qrecent = rec;
-    $('#queue').innerHTML = head + `<div class="rp-body">${rec.length ? `<div class="q-sec"><h4>최근 재생한 곡</h4></div>` + rec.map((t, i) => `${queueRow(t, i, 'play', 'data-list="qrecent" data-ctx="track"')}<button data-act="more" data-list="qrecent" data-i="${i}" title="더보기">${ic('more')}</button></div>`).join('') : '<p class="m-hint">아직 없어요</p>'}</div>`;
-    return;
-  }
   const mine = Q.list.slice(Q.i + 1, Q.i + 1 + Q.user).map((t, k) => ({ t, k: Q.i + 1 + k }));
   const rest = Q.list.slice(Q.i + 1 + Q.user).map((t, k) => ({ t, k: Q.i + 1 + Q.user + k }));
   const row = ({ t, k }) => `${queueRow(t, k, 'jump', `draggable="true" data-qrow="${k}"`)}<button data-act="unqueue" data-i="${k}" title="빼기">${ic('close')}</button></div>`;
   $('#queue').innerHTML = head + `<div class="rp-body">
     <div class="q-sec"><h4>지금 재생 중</h4></div>
     ${cur ? `<div class="trk cur"><img src="${thumb(cur.id)}" alt=""><div class="tx"><div class="t1">${esc(meta(cur).title)}</div><div class="t2">${esc(meta(cur).artist)}</div></div><span></span></div>` : '<p class="m-hint">없음</p>'}
-    ${mine.length ? `<div class="q-sec"><h4>다음 대기열</h4><button data-act="clearqueue">대기열 비우기</button></div>${mine.map(row).join('')}` : ''}
-    ${rest.length || !mine.length ? `<div class="q-sec"><h4>${Q.ctx?.name ? `다음: ${esc(Q.ctx.name)}` : '다음 곡'}</h4></div>` : ''}
+    ${mine.length ? `<div class="q-sec"><h4>다음 재생 항목</h4><button data-act="clearqueue">재생목록 지우기</button></div>${mine.map(row).join('')}` : ''}
+    ${rest.length || !mine.length ? `<div class="q-sec"><h4>${Q.ctx?.name ? `다음 재생 ${esc(Q.ctx.name)}` : '다음 재생'}</h4></div>` : ''}
     ${rest.length ? rest.map(row).join('')
       : mine.length ? '' : `<p class="m-hint">${useAuto() && cur && !Q.autoEmpty ? '곡이 끝나면 자동 추천이 이어져요' : store.repeat === 'all' && Q.list.length ? '처음부터 다시 재생돼요' : '비어 있어요'}</p>`}
     ${Q.auto.length && useAuto() ? `<div data-auto-section>
@@ -2448,6 +2469,9 @@ function renderNow() {
   $('#b-lyrics').classList.toggle('on', route.name === 'lyrics');
   $('#b-sleep').classList.toggle('on', sleepOn());
   $('#b-speed').classList.toggle('on', (store.settings.speed || 1) !== 1);
+  // 재생 바에는 평소 안 보이고, 켜 둔 동안만 표시한다 (켜는 곳은 지금 재생 중 패널의 더보기)
+  $('#b-sleep').hidden = !sleepOn();
+  $('#b-speed').hidden = (store.settings.speed || 1) === 1;
   $('#b-mute').innerHTML = ic(store.volume === 0 ? 'volume-off' : store.volume < 50 ? 'volume-down' : 'volume');
   document.querySelectorAll('#main .ab[data-act="shuffle"]').forEach(b => b.classList.toggle('on', !!store.shuffle));
   renderRight();
@@ -2519,14 +2543,14 @@ function showMenu(anchor, key, i) {
   menuTracks = sel.key === key && sel.set.has(i) && sel.set.size > 1 ? selTracks() : [menuTrack];
   const many = menuTracks.length > 1, liked = isLiked(menuTrack.id, menuKind), m = meta(menuTrack);
   $('#menu').innerHTML = `
-    <button data-act="m-addto">${ic('add')}<span>플레이리스트에 추가</span>${ic('chev-r')}</button>
-    ${key.startsWith('pl:') ? mi('m-remove', 'delete', '이 플레이리스트에서 제거') : ''}
-    ${mi('m-like', liked ? 'check-circle' : 'add-circle', liked ? '좋아요 취소' : '좋아요')}
+    <button data-act="m-addto">${ic('add')}<span>플레이리스트에 추가하기</span>${ic('chev-r')}</button>
+    ${key.startsWith('pl:') ? mi('m-remove', 'delete', '이 플레이리스트에서 삭제하기') : ''}
+    ${mi('m-like', liked ? 'check-circle' : 'add-circle', liked ? '좋아요 표시한 곡에서 삭제' : '좋아요 표시한 곡에 추가')}
+    ${mi('m-queue', 'queue', '재생목록에 추가하기')}
     ${mi('m-next', 'next', '다음에 재생')}
-    ${mi('m-queue', 'queue', '대기열에 추가')}
     ${mi('m-dislike', 'thumb-down-o', isDisliked(menuTrack.id, menuKind) ? '싫어요 취소' : '싫어요')}
-    ${many ? '' : `<hr>${mi('m-radio', 'radio', '곡 라디오로 이동')}${m.artist ? mi('m-artist', 'person', '아티스트로 이동') : ''}`}
-    <hr>${DL_ITEMS}${many ? '' : `<hr>${mi('m-share', 'link', '곡 링크 복사')}`}`;
+    ${many ? '' : `<hr>${mi('m-radio', 'radio', '음악 라디오 보러가기')}${m.artist ? mi('m-artist', 'person', '아티스트로 이동하기') : ''}${mi('m-share', 'link', '곡 링크 복사')}`}
+    <hr>${DL_ITEMS}${key === 'now' ? `<hr>${mi('sleepmenu', 'moon', '수면 타이머')}${mi('speedmenu', 'speed', '재생 속도')}` : ''}`;
   placeMenu(anchor);
 }
 // 재생 바의 받기 버튼: 지금 곡 받기 메뉴
@@ -2554,7 +2578,10 @@ function showFolderMenu(anchor, f) {
 }
 function showArtistMenu(anchor, name) {
   menuThing = name;
-  $('#menu').innerHTML = `${mi('follow', 'person', isFollowing(name) ? '팔로우 취소' : '팔로우하기', `data-id="${esc(name)}"`)}${mi('playartist', 'radio', '이 아티스트 재생', `data-id="${esc(name)}"`)}${isFollowing(name) ? pinItem('ar:' + name) : ''}`;
+  const seed = (artistShown.get(name)?.top || [])[0] || myTracksOf(name)[0];
+  menuTrack = seed || null; menuTracks = seed ? [seed] : []; menuKind = kind();
+  const n = `data-id="${esc(name)}"`;
+  $('#menu').innerHTML = `${mi('follow', 'person', isFollowing(name) ? '팔로우 취소' : '팔로우하기', n)}${mi('ar-block', 'thumb-down-o', store.noArtist.includes(name) ? '이 아티스트 재생 안 함 취소' : '이 아티스트 재생 안 함', n)}${seed ? mi('m-radio', 'radio', '아티스트 라디오 보러가기') : mi('playartist', 'radio', '아티스트 라디오 보러가기', n)}${isFollowing(name) ? pinItem('ar:' + name) : ''}`;
   placeMenu(anchor);
 }
 function showAddTo(btn) {
@@ -2844,7 +2871,7 @@ function ctxOf(key) {
   return { key, name: '' };
 }
 // 곡 하나를 틀면 그 뒤는 자동 추천으로 이어지는 목록
-const SINGLE = new Set(['search', 'quick', 'recent', 'top', 'rewind', 'popular', 'metop', 'vrecent', 'vtop', 'qrecent']);
+const SINGLE = new Set(['search', 'quick', 'recent', 'top', 'rewind', 'popular', 'metop', 'vrecent', 'vtop']);
 function playFrom(key, i) {
   if ((key === 'vrecent' || key === 'vtop') && route.name !== 'video') go({ name: 'video' });
   const ctx = ctxOf(key);
@@ -2982,6 +3009,8 @@ document.addEventListener('click', e => {
     case 'newfolder': { const f = newFolder(); hideMenu(); renderLibHead(); go({ name: 'folder', id: f.id }); editFolder(f); break; }
     case 'folderedit': { const f = folderById(id); if (f) { hideMenu(); editFolder(f); } break; }
     case 'pledit': { const p = plById(id); if (p) editPlaylist(p); break; }
+    case 'plfindopen': finderOpen.add(id); renderMain(); $('#main .finder input')?.focus(); $('#main .finder')?.scrollIntoView({ block: 'nearest' }); break;
+    case 'plfindclose': finderOpen.delete(id); renderMain(); break;
     case 'plmore': showPlMenu(el, plById(id)); break;
     case 'likedmore': $('#menu').innerHTML = mi('likedcopy', 'add', '플레이리스트로 만들기', `data-id="${id}"`); placeMenu(el); break;
     case 'likedcopy': {
@@ -3026,6 +3055,13 @@ document.addEventListener('click', e => {
     case 'modalclose': closeModal(); break;
     case 'follow': toggleFollow(id); hideMenu(); break;
     case 'armore': showArtistMenu(el, id); break;
+    case 'ar-block': {
+      const on = store.noArtist.includes(id);
+      store.noArtist = on ? store.noArtist.filter(n => n !== id) : [...store.noArtist, id];
+      if (!on) Q.auto = Q.auto.filter(t => !artistBlocked(t));
+      save(); hideMenu(); renderQueue(); toast(on ? '이 아티스트가 다시 추천에 나와요' : '이 아티스트는 자동 추천에서 빠져요');
+      break;
+    }
     case 'armoretoggle': artistMore.has(id) ? artistMore.delete(id) : artistMore.add(id); renderMain(); break;
     case 'radiomore': $('#menu').innerHTML = mi('radiosave', 'add', '플레이리스트로 저장', `data-id="${esc(id)}"`); placeMenu(el); break;
     case 'radiosave': {
@@ -3048,7 +3084,10 @@ document.addEventListener('click', e => {
       clearSel(); renderMain(); break;
     }
     case 'listfind': viewOf(key).find = true; renderMain(); $('#main [data-listq]')?.focus(); break;
-    case 'compact': store.settings.compact = !store.settings.compact; save(); renderMain(); break;
+    case 'viewmenu':
+      $('#menu').innerHTML = `<p class="m-cap">보기 설정</p>${[['compact', 'menu', '작게'], ['list', 'bullet', '목록']].map(([k, icon, label]) => `<button data-act="viewset" data-id="${k}">${ic(icon)}<span>${label}</span>${(k === 'compact') === !!store.settings.compact ? ic('check') : ''}</button>`).join('')}`;
+      placeMenu(el); break;
+    case 'viewset': store.settings.compact = id === 'compact'; save(); hideMenu(); renderMain(); break;
     case 'libmin': store.lib.min = !store.lib.min; save(); renderLibHead(); renderLib(); break;
     case 'libwide': setLibWide(!libWideOn()); break;
     case 'libchip': store.lib.filter = store.lib.filter === id ? '' : id; save(); renderLibHead(); renderLib(); break;
@@ -3071,7 +3110,6 @@ document.addEventListener('click', e => {
     case 'todoc': setMode('doc'); break;
     case 'panel': setPanel(el.dataset.panel); break;
     case 'panelclose': store.panel = ''; save(); renderRight(); break;
-    case 'qtab': queueTab = id; renderQueue(); break;
     case 'lyrics': go(route.name === 'lyrics' ? lastRoute : { name: 'lyrics' }); break;
     case 'lyricline': if (playerReady && current()) { player.seekTo(Math.max(0, +el.dataset.t - shiftOf(current().id)), true); tickLyrics(); } break;
     case 'lyricshift': nudgeLyrics(+id); break;
@@ -3081,13 +3119,17 @@ document.addEventListener('click', e => {
     case 'fs': openFs(!fsOpen); break;
     case 'mini': openMini(); break;
     case 'mute': toggleMute(); break;
-    case 'sleepmenu':
+    case 'sleepmenu': {
+      const at = el.closest('#menu') ? el.getBoundingClientRect() : el;
       $('#menu').innerHTML = `${sleepOn() ? `<p class="m-cap">${esc(sleepText())}</p>` + mi('sleepset', 'close', '타이머 끄기', 'data-id="0"') + '<hr>' : ''}${[5, 10, 15, 30, 45, 60].map(n => mi('sleepset', 'moon', n < 60 ? `${n}분` : '1시간', `data-id="${n}"`)).join('')}${mi('sleepset', 'moon', '곡이 끝날 때', 'data-id="end"')}`;
-      placeMenu(el); break;
+      placeMenu(at); break;
+    }
     case 'sleepset': setSleep(id); hideMenu(); break;
-    case 'speedmenu':
+    case 'speedmenu': {
+      const at = el.closest('#menu') ? el.getBoundingClientRect() : el;
       $('#menu').innerHTML = [0.75, 1, 1.25, 1.5, 2].map(v => mi('speedset', (store.settings.speed || 1) === v ? 'check' : 'blank', `${v}배`, `data-id="${v}"`)).join('');
-      placeMenu(el); break;
+      placeMenu(at); break;
+    }
     case 'speedset': setSpeed(+id); hideMenu(); break;
     case 'jump': jumpTo(i); break;
     case 'autoplaynow': {
