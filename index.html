@@ -163,7 +163,7 @@
   #quick .q-ctl small { font-size: 10px; }
 
   /* 상단 바 */
-  .m-top { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(350px, 546px) minmax(0, 1fr); align-items: center; gap: 8px; }
+  .m-top { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(350px, 778px) minmax(0, 1fr); align-items: center; gap: 8px; }
   .m-tl { display: flex; gap: 8px; align-items: center; padding-left: 8px; }
   .m-tl button { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.07); color: #fff; display: grid; place-items: center; }
   .m-tl button:disabled { color: #5a5a5a; cursor: not-allowed; background: rgba(255,255,255,.03); }
@@ -172,7 +172,7 @@
   .m-homeb .mi { width: 24px; height: 24px; }
   .m-homeb:hover { background: var(--el2); color: #fff; transform: scale(1.04); }
   .m-homeb.on { color: #fff; }
-  .m-search { flex: 1; min-width: 0; height: 48px; border-radius: 500px; background: var(--el); display: flex; align-items: center; padding: 0 12px; color: var(--sub); }
+  .m-search { flex: 1 1 474px; max-width: 474px; min-width: 0; height: 48px; border-radius: 500px; background: var(--el); display: flex; align-items: center; padding: 0 12px; color: var(--sub); }
   .m-search:hover { background: var(--el2); }
   .m-search:focus-within { background: var(--el2); box-shadow: inset 0 0 0 2px #fff; color: #fff; }
   .m-search .mi { width: 24px; height: 24px; }
@@ -181,6 +181,14 @@
   .m-search input::-webkit-search-cancel-button { display: none; }
   .m-search .sep { width: 1px; height: 24px; background: #7c7c7c; margin: 0 12px 0 8px; flex: none; }
   .m-search button { color: var(--sub); display: grid; place-items: center; }
+  .m-search button[hidden] { display: none; }
+  .m-vsearch { flex: 0 1 240px; }
+  @media (max-width: 1240px) {
+    .m-top { grid-template-columns: minmax(0, 1fr) minmax(350px, 602px) minmax(0, 1fr); }
+    .m-vsearch:not(.open) { flex: 0 0 48px; padding: 0; justify-content: center; }
+    .m-vsearch:not(.open) input, .m-vsearch:not(.open) #b-clearvq { display: none; }
+    .m-vsearch.open { flex: 0 1 200px; }
+  }
   .m-search button:hover, .m-search button.on { color: #fff; }
   .m-tr { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 0 8px 0 0; }
   .m-tr button { position: relative; width: 32px; height: 32px; border-radius: 50%; color: var(--sub); display: grid; place-items: center; }
@@ -312,26 +320,57 @@
   .mosaic img { width: 100%; height: 100%; object-fit: cover; display: block; min-height: 0; min-width: 0; }
 
   /* 검색 */
-  .browse { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
-  .btile { aspect-ratio: 16 / 9; border-radius: 8px; padding: 12px 16px; position: relative; overflow: hidden; font-size: 20px; font-weight: 700; text-align: left; color: #fff; display: flex; align-items: flex-start; cursor: pointer; line-height: 1.25; word-break: keep-all; }
+  .browse { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 24px; }
+  .btile { aspect-ratio: 16 / 9; border-radius: 8px; padding: 16px; position: relative; overflow: hidden; font-size: 24px; font-weight: 700; text-align: left; color: #fff; display: flex; align-items: flex-start; cursor: pointer; line-height: 1.25; word-break: keep-all; }
   .btile span { position: relative; z-index: 1; max-width: 72%; }
   .btile img { position: absolute; right: 0; bottom: 0; width: 45%; aspect-ratio: 1; object-fit: cover; transform: rotate(25deg) translate(18%, -2%); box-shadow: 0 2px 4px rgba(0,0,0,.2); border-radius: 4px; }
   .search-chips { padding: 8px 0 16px; }
-  .sres { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 24px; }
-  .sres h2 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-  .top { background: #181818; border-radius: 8px; padding: 20px; position: relative; cursor: pointer; transition: background .2s; min-height: 200px; }
+  .top { height: 104px; box-sizing: border-box; padding: 16px; margin-bottom: 16px; border-radius: 8px; background: #181818; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: background .2s; }
   .top:hover { background: #282828; }
-  .top img { width: 92px; height: 92px; object-fit: cover; border-radius: 6px; display: block; box-shadow: 0 8px 24px rgba(0,0,0,.5); margin-bottom: 16px; }
-  .top .t1 { font-size: 32px; font-weight: 800; line-height: 1.2; letter-spacing: -.02em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .top .t2 { color: var(--sub); margin-top: 6px; }
-  .top .cplay { right: 20px; bottom: 20px; }
+  .top img { width: 72px; height: 72px; object-fit: cover; border-radius: 4px; flex: none; }
+  .top.ar img { border-radius: 50%; }
+  .top .tx { flex: 1; min-width: 0; }
+  .top .t1 { font-size: 24px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top .t2 { color: var(--sub); font-size: 14px; margin-top: 4px; }
+  .top .cplay { position: static; opacity: 1; transform: none; flex: none; }
+  .mixed .trk[data-row], .mix-art { display: grid; grid-template-columns: minmax(0, 1fr) auto; height: 80px; padding: 0 8px; gap: 16px; align-items: center; border-radius: 4px; }
+  .mix-art { cursor: pointer; }
+  .mix-art:hover { background: var(--hov); }
+  .mix-art .tt { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .mixed .trk[data-row] .n, .mixed .c-art, .mixed .c-dur { display: none; }
+  .mixed .trk[data-row] img, .mix-art img { width: 64px; height: 64px; object-fit: cover; }
+  .mix-art img { border-radius: 50%; }
+  .mix-art .t1 { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mix-art .t2 { color: var(--sub); font-size: 14px; }
+  .mixed .trk[data-row] .t2::before { content: "곡 · "; }
+  .s-empty { text-align: center; padding-top: 96px; }
+  .s-empty h2 { font-size: 24px; font-weight: 700; margin: 0 0 8px; overflow-wrap: anywhere; }
+  /* 영상 검색 */
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .vcard { cursor: pointer; min-width: 0; padding: 8px; border-radius: 8px; }
+  .vcard:hover { background: var(--hov); }
+  .vthumb { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #282828; }
+  .vthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vthumb span { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.8); color: #fff; font-size: 12px; font-weight: 700; padding: 1px 4px; border-radius: 4px; }
+  .vcard .t1, .vnext .t1 { font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .vcard .t1 { margin-top: 8px; font-size: 14px; }
+  .vcard .t2, .vnext .t2 { color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vcard .t2 { font-size: 13px; }
+  .vid-page { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+  .vid-page:has(#vid-next:empty) { grid-template-columns: minmax(0, 1fr); }
+  #vid-next { min-width: 0; }
+  #vid-next h2 { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+  .vnext { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 8px; padding: 4px; border-radius: 8px; cursor: pointer; }
+  .vnext:hover { background: var(--hov); }
+  .vnext .t1 { font-size: 13px; }
+  .vnext .t2 { font-size: 12px; }
   .rec-row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 6px; cursor: pointer; }
   .rec-row:hover { background: var(--hov); }
   .rec-row .pic { width: 48px; height: 48px; border-radius: 4px; background: #282828; display: grid; place-items: center; color: var(--sub); flex: none; }
   .rec-row .t1 { flex: 1; min-width: 0; font-size: 16px; }
   .rec-row button { color: var(--sub); width: 32px; height: 32px; display: grid; place-items: center; }
   .rec-row button:hover { color: #fff; }
-  @container (max-width: 700px) { .sres { grid-template-columns: minmax(0, 1fr); } }
+  @container (max-width: 860px) { .vid-page { grid-template-columns: minmax(0, 1fr); } }
 
   /* 머리 영역 + 표 */
   .hero { position: relative; display: flex; gap: 24px; align-items: flex-end; padding: 24px; min-height: clamp(240px, 25.2cqw, 312px); background: linear-gradient(transparent, rgba(0,0,0,.5)), var(--hc); transition: background-color .5s; }
@@ -751,6 +790,11 @@
         <button type="button" data-act="clearq" id="b-clearq" title="지우기" hidden><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button>
         <i class="sep"></i>
         <button type="button" data-act="go" data-route="search" id="b-browse" title="둘러보기"><svg class="mi" aria-hidden="true"><use href="#m-browse"/></svg></button>
+      </form>
+      <form class="m-search m-vsearch" data-form="vsearch">
+        <button type="button" data-act="vfocus" title="영상 검색"><svg class="mi" aria-hidden="true"><use href="#m-video"/></svg></button>
+        <input id="m-vq" type="search" placeholder="영상 검색" autocomplete="off" spellcheck="false" title="YouTube 영상 검색">
+        <button type="button" data-act="clearvq" id="b-clearvq" title="지우기" hidden><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button>
       </form>
     </div>
     <div class="m-tr m-nav">
@@ -1717,11 +1761,11 @@ async function search(q, { backup = true, link = true } = {}) {
   if (!q) return [];
   const id = link ? parseId(q) : null;
   if (id) return [{ id, title: id, channel: LINK_CHANNEL, duration: '', seconds: 0 }];
-  let why = '';
+  let why = '', none = false;
   try {
     const j = await searchApi({ action: 'search', q });
     if (j.results && j.results.length) return j.results;
-    why = j.error || '결과 없음';
+    why = j.error || ''; none = !j.error;
   } catch (e) { why = e.message; }
   // 예비 검색: 남의 서버(Invidious)라 검색어가 그쪽으로 간다. 설정에서 끌 수 있고, 받은 결과는 영상 ID 모양이 맞는 것만 쓴다
   if (backup && store.settings.invidiousOn !== false) {
@@ -1733,6 +1777,7 @@ async function search(q, { backup = true, link = true } = {}) {
       if (out.length) return out;
     } catch (e) {}
   }
+  if (none) return []; // 서버는 제대로 답했는데 없는 것. 실패가 아니다
   throw new Error('검색 실패' + (why ? ` (${why})` : ''));
 }
 
@@ -1896,7 +1941,8 @@ window.addEventListener('blur', () => setTimeout(() => {
 const lists = {};
 const isLiked = (id, k) => bucket(k).liked.some(t => t.id === id);
 // 목록에서 누른 저장 버튼·더보기는 그 목록의 쪽 (좋아요 표시한 영상 목록이면 영상)
-const listKind = key => (key === 'liked' && route.name === 'liked' && route.id === 'video' ? 'video' : kind());
+const VIDEO_LISTS = new Set(['vsearch', 'vrecent', 'vtop']);
+const listKind = key => (VIDEO_LISTS.has(key) || (key === 'liked' && route.name === 'liked' && route.id === 'video') ? 'video' : kind());
 const plById = id => store.playlists.find(p => p.id === id);
 const folderById = id => store.folders.find(f => f.id === id);
 const isCur = t => current()?.id === t.id;
@@ -2099,15 +2145,26 @@ function renderSearch(el) {
   const artists = [];
   for (const t of res) { const name = meta(t).artist; if (name && !artists.some(a => sameArtist(a.name, name))) artists.push({ name, t }); }
   const chips = `<div class="chips search-chips">${[['all', '모두'], ['songs', '곡'], ['artists', '아티스트']].map(([k, l]) => `<button class="chip${searchTab === k ? ' on' : ''}" data-act="searchchip" data-id="${k}">${l}</button>`).join('')}</div>`;
-  if (!res.length) { lists.search = []; el.innerHTML = `<div class="pad"><p class="m-hint">결과가 없어요</p></div>`; return; }
+  if (!res.length) { lists.search = []; el.innerHTML = `<div class="pad s-empty"><h2>'${esc(s.q)}'에 대한 검색 결과가 없습니다</h2><p class="m-hint">철자를 확인하거나 다른 검색어를 사용해 보세요.</p></div>`; return; }
   let body;
   if (searchTab === 'songs') body = trackTable('search', res);
   else if (searchTab === 'artists') { lists.search = res; body = `<div class="gridall">${artists.map(cardArtist).join('')}</div>`; }
   else {
-    const t = res[0], m = meta(t), rows = trackTable('search', res, { head: false, limit: 4, raw: true });
-    body = `<div class="sres"><section><h2>상위 결과</h2><div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(m.artist)}` : ''}</div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div></section><section><h2>곡</h2>${rows}</section></div>
-      ${artists.length ? shelf('아티스트', artists.slice(0, 12).map(cardArtist).join('')) : ''}
-      ${res.length > 4 ? `<section class="shelf"><div class="shelf-h"><h2>더 많은 곡</h2></div><div class="row1">${res.slice(4, 16).map((x, i) => cardTrack('search', x, i + 4)).join('')}</div></section>` : ''}`;
+    // 맨 위 띠: 검색어가 가수 이름이면 가수, 아니면 첫 곡. 그 아래는 곡과 가수가 섞인 한 줄 목록
+    lists.search = res;
+    const hit = artists.find(a => sameArtist(a.name, s.q)), t = res[0], m = meta(t);
+    const followBtn = name => `<button class="pill" data-act="follow" data-id="${esc(name)}">${isFollowing(name) ? '팔로잉' : '팔로우하기'}</button>`;
+    const band = hit
+      ? `<div class="top ar" data-act="go" data-route="artist" data-id="${esc(hit.name)}"><img src="${thumb(hit.t.id)}" alt=""><div class="tx"><div class="t1">${esc(hit.name)}</div><div class="t2">아티스트</div></div>${followBtn(hit.name)}<button class="cplay" data-act="playartist" data-id="${esc(hit.name)}" title="재생">${ic('play')}</button></div>`
+      : `<div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(m.artist)}` : ''}</div></div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div>`;
+    const mixArtist = a => `<div class="mix-art" data-act="go" data-route="artist" data-id="${esc(a.name)}"><div class="tt"><img src="${thumb(a.t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(a.name)}</div><div class="t2">아티스트</div></div></div>${followBtn(a.name)}</div>`;
+    const others = artists.filter(a => a !== hit).slice(0, 6), mixed = [];
+    res.forEach((x, i) => {
+      if (!hit && !i) return;
+      mixed.push(trackRow('search', x, i, { album: false }));
+      if (mixed.length % 4 === 3 && others.length) mixed.push(mixArtist(others.shift()));
+    });
+    body = `${band}<div class="tbl mixed noalb nodate">${mixed.concat(others.map(mixArtist)).join('')}</div>`;
   }
   el.innerHTML = `<div class="pad" style="padding-top:8px">${chips}${body}</div>`;
 }
@@ -2136,7 +2193,10 @@ function loadRecs(p) {
 }
 function finderResults(p) {
   const f = finderOf(p.id), have = new Set(p.tracks.map(t => t.id));
-  return f.loading ? '<p class="m-hint">검색 중…</p>' : f.error ? `<p class="m-hint">${esc(f.error)}</p>` : offerRows('find:' + p.id, f.results.filter(t => !have.has(t.id)).slice(0, 10), p.id);
+  if (f.loading) return '<p class="m-hint">검색 중…</p>';
+  if (f.error) return `<p class="m-hint">${esc(f.error)}</p>`;
+  if (f.q && !f.results.length) return '<p class="m-hint">찾는 곡이 없어요</p>';
+  return offerRows('find:' + p.id, f.results.filter(t => !have.has(t.id)).slice(0, 10), p.id);
 }
 function finderRecs(p) {
   const have = new Set(p.tracks.map(t => t.id)), recs = (plRecs[p.id]?.list || []).filter(t => !have.has(t.id)).slice(0, 10);
@@ -2297,14 +2357,44 @@ function renderSettings(el) {
     <div class="actions"><button class="pill" data-doc="keys">단축키 보기 (Ctrl+/)</button><button class="pill" data-doc="log">업데이트 내역</button></div>
   </div></div>`;
 }
+// 대기열과 자동 추천에서 앞으로 나올 영상
+function videoNext() {
+  const up = Q.list.slice(Q.i + 1, Q.i + 13).map((t, k) => ({ t, act: 'jump', i: Q.i + 1 + k }));
+  const auto = useAuto() ? Q.auto.map((t, i) => ({ t, act: 'autoplaynow', i })) : [];
+  const all = up.concat(auto).slice(0, 12);
+  return all.length ? `<h2>다음 영상</h2>${all.map(({ t, act, i }) => `<div class="vnext" data-act="${act}" data-i="${i}"><div class="vthumb"><img src="${thumb(t.id)}" alt="" loading="lazy">${t.duration ? `<span>${esc(t.duration)}</span>` : ''}</div><div class="tx"><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div></div>`).join('')}` : '';
+}
 function renderVideo(el) {
   const t = current(), m = t && meta(t);
-  el.innerHTML = `<div class="pad"><div id="video-slot">${t ? '' : '재생 중인 곡이 없어요'}</div>
-    ${t ? `<div class="vid-t">${esc(m.title)}</div><p class="m-hint vid-s">${esc(m.artist)} · V 또는 영상 버튼으로 닫기</p>` : ''}</div>`;
+  el.innerHTML = `<div class="pad vid-page"><div><div id="video-slot">${t ? '' : '재생 중인 곡이 없어요'}</div>
+    ${t ? `<div class="vid-t">${esc(m.title)}</div><p class="m-hint vid-s">${esc(m.artist)} · V 또는 영상 버튼으로 닫기</p>` : ''}</div><aside id="vid-next">${videoNext()}</aside></div>`;
+}
+// 영상 검색: 음악 검색과 결과, 기록을 따로 둔다
+const vsearches = () => store.video.searches || (store.video.searches = []); // 옛 저장 데이터에는 이 칸이 없다
+const vCard = (key, t, i) => `<div class="vcard" data-act="play" data-list="${esc(key)}" data-i="${i}" data-ctx="track"><div class="vthumb"><img src="${thumb(t.id)}" alt="" loading="lazy">${t.duration ? `<span>${esc(t.duration)}</span>` : ''}</div><div class="t1">${esc(t.title)}</div><div class="t2">${esc(t.channel)}</div></div>`;
+function renderVSearch(el) {
+  const s = vsearchState;
+  $('#main').style.removeProperty('--hc');
+  if (s.loading) { el.innerHTML = '<div class="pad"><p class="m-hint">검색 중…</p></div>'; return; }
+  if (s.error) { el.innerHTML = `<div class="pad"><p class="m-hint">${esc(s.error)}</p></div>`; return; }
+  if (!s.q) {
+    const qs = vsearches(), rec = bucket('video').recent.slice(0, 12);
+    lists.vrecent = rec;
+    el.innerHTML = `<div class="pad">
+      ${qs.length ? `<section style="margin-bottom:32px"><div class="shelf-h"><h2>최근 영상 검색</h2><a class="more" data-act="vrecentclear">모두 지우기</a></div>${qs.slice(0, 6).map((q, i) => `<div class="rec-row" data-act="vrecentq" data-i="${i}"><span class="pic">${ic('search')}</span><span class="t1">${esc(q)}</span><button data-act="vrecentdel" data-i="${i}" title="지우기">${ic('close')}</button></div>`).join('')}</section>` : ''}
+      ${rec.length ? `<div class="shelf-h"><h2>최근 본 영상</h2></div><div class="vgrid">${rec.map((t, i) => vCard('vrecent', t, i)).join('')}</div>` : ''}
+      ${qs.length || rec.length ? '' : '<div class="s-empty"><h2>어떤 영상을 볼까요?</h2><p class="m-hint">위쪽 영상 검색 칸에 검색어를 넣어 보세요.</p></div>'}
+    </div>`;
+    return;
+  }
+  lists.vsearch = s.results;
+  el.innerHTML = s.results.length ? `<div class="pad"><div class="vgrid">${s.results.map((t, i) => vCard('vsearch', t, i)).join('')}</div></div>`
+    : `<div class="pad s-empty"><h2>'${esc(s.q)}'에 대한 영상이 없습니다</h2><p class="m-hint">철자를 확인하거나 다른 검색어를 사용해 보세요.</p></div>`;
 }
 
-const PAGES = { home: renderHome, search: renderSearch, liked: renderLiked, playlist: renderPlaylist, folder: renderFolder, artist: renderArtist, radio: renderRadio, shelf: renderShelf, me: renderMe, downloads: renderDownloads, disliked: renderDisliked, settings: renderSettings, video: renderVideo, lyrics: renderLyrics };
+const PAGES = { home: renderHome, search: renderSearch, vsearch: renderVSearch, liked: renderLiked, playlist: renderPlaylist, folder: renderFolder, artist: renderArtist, radio: renderRadio, shelf: renderShelf, me: renderMe, downloads: renderDownloads, disliked: renderDisliked, settings: renderSettings, video: renderVideo, lyrics: renderLyrics };
 let searchState = { q: '', results: [], loading: false, error: '' };
+let vsearchState = { q: '', results: [], loading: false, error: '' }, vsearchTimer = 0, vsearchSeq = 0;
 function renderMain() {
   const el = $('#main'), f = PAGES[route.name];
   if (f) f(el, route);
@@ -2447,6 +2537,8 @@ function renderQueue() {
       ${Q.auto.map((t, k) => `${queueRow(t, k, 'autoplaynow')}<button data-act="autoremove" data-i="${k}" title="빼기">${ic('close')}</button></div>`).join('')}
     </div>` : ''}</div>`;
   if (store.panel === 'now') renderNowView();
+  const vn = $('#vid-next');
+  if (vn) { vn.innerHTML = videoNext(); placePlayer(); }
 }
 
 function renderNow() {
@@ -2868,14 +2960,16 @@ function ctxOf(key) {
   if (key.startsWith('ar:')) return { key, name: key.slice(3), route: { name: 'artist', id: key.slice(3) } };
   if (key.startsWith('radio:')) return { key, name: route.label || `${route.title || '곡'} 라디오`, route: { ...route } };
   if (key === 'search') return { key, name: '검색 결과' };
+  if (key === 'vsearch') return { key, name: '영상 검색 결과', route: { name: 'vsearch' } };
   return { key, name: '' };
 }
 // 곡 하나를 틀면 그 뒤는 자동 추천으로 이어지는 목록
-const SINGLE = new Set(['search', 'quick', 'recent', 'top', 'rewind', 'popular', 'metop', 'vrecent', 'vtop']);
+const SINGLE = new Set(['search', 'quick', 'recent', 'top', 'rewind', 'popular', 'metop', 'vrecent', 'vtop', 'vsearch']);
 function playFrom(key, i) {
-  if ((key === 'vrecent' || key === 'vtop') && route.name !== 'video') go({ name: 'video' });
+  if (VIDEO_LISTS.has(key) && route.name !== 'video') go({ name: 'video' });
   const ctx = ctxOf(key);
   if (key === 'search') rememberSearch(searchState.q);
+  if (key === 'vsearch') rememberVideoSearch(vsearchState.q);
   if (SINGLE.has(key) && autoplayOn()) setQueue([lists[key][i]], 0, 'search', ctx);
   else setQueue(lists[key], i, 'list', ctx);
 }
@@ -2895,6 +2989,12 @@ function cycleShuffle() {
     }
   }
   save(); renderQueue(); renderNow();
+}
+function rememberVideoSearch(q) {
+  q = String(q || '').trim();
+  if (!q || parseId(q)) return;
+  store.video.searches = [q, ...vsearches().filter(x => x !== q)].slice(0, 10);
+  save();
 }
 function rememberSearch(q) {
   q = String(q || '').trim();
@@ -3078,6 +3178,11 @@ document.addEventListener('click', e => {
     case 'recentdel': store.searches.splice(i, 1); save(); renderMain(); break;
     case 'recentclear': store.searches = []; save(); renderMain(); break;
     case 'clearq': $('#m-q').value = ''; syncClear(); clearSearch(); $('#m-q').focus(); break;
+    case 'clearvq': $('#m-vq').value = ''; syncVClear(); clearVSearch(); $('#m-vq').focus(); break;
+    case 'vfocus': $('.m-vsearch').classList.add('open'); $('#m-vq').focus(); if (route.name !== 'vsearch') go({ name: 'vsearch' }); break;
+    case 'vrecentq': { const q = vsearches()[i]; $('#m-vq').value = q; syncVClear(); runVSearch(q); break; }
+    case 'vrecentdel': vsearches().splice(i, 1); save(); renderMain(); break;
+    case 'vrecentclear': store.video.searches = []; save(); renderMain(); break;
     case 'sortcol': {
       const v = viewOf(key), col = el.dataset.col;
       if (v.by !== col) { v.by = col; v.dir = 1; } else if (v.dir > 0) v.dir = -1; else { v.by = ''; v.dir = 1; }
@@ -3357,6 +3462,33 @@ async function runSearch(q) {
   searchState = { q, results, loading: false, error };
   if (route.name === 'search') renderMain();
 }
+const syncVClear = () => { $('#b-clearvq').hidden = !$('#m-vq').value; };
+function clearVSearch() {
+  clearTimeout(vsearchTimer); vsearchSeq++;
+  vsearchState = { q: '', results: [], loading: false, error: '' };
+  if (route.name === 'vsearch') renderMain();
+}
+async function runVSearch(q) {
+  clearTimeout(vsearchTimer);
+  if (!q.trim()) return clearVSearch();
+  const seq = ++vsearchSeq;
+  vsearchState = { q, results: [], loading: true, error: '' };
+  if (route.name === 'vsearch') renderMain(); else go({ name: 'vsearch' });
+  let results = [], error = '';
+  try { results = await search(q); } catch (err) { error = err.message; }
+  if (seq !== vsearchSeq) return;
+  vsearchState = { q, results, loading: false, error };
+  if (route.name === 'vsearch') renderMain();
+}
+$('#m-vq').addEventListener('input', e => {
+  syncVClear();
+  clearTimeout(vsearchTimer);
+  const q = e.target.value;
+  if (route.name !== 'vsearch') go({ name: 'vsearch' });
+  if (!q.trim()) return clearVSearch();
+  vsearchTimer = setTimeout(() => { if (q !== vsearchState.q) runVSearch(q); }, 600);
+});
+$('#m-vq').addEventListener('blur', e => { if (!e.target.value) $('.m-vsearch').classList.remove('open'); });
 // 치는 대로 찾는다 (잠깐 멈추면)
 $('#m-q').addEventListener('input', e => {
   syncClear();
@@ -3371,6 +3503,7 @@ document.addEventListener('submit', async e => {
   if (!form) return;
   e.preventDefault();
   if (form === 'search') { const q = $('#m-q').value; rememberSearch(q); runSearch(q); }
+  if (form === 'vsearch') { const q = $('#m-vq').value; rememberVideoSearch(q); runVSearch(q); }
   if (form === 'pledit') {
     const p = plById(f.dataset.id), name = f.elements.name.value.trim();
     if (!p) return closeModal();
@@ -3684,7 +3817,7 @@ $('#q-input').addEventListener('keydown', async e => {
   if (seq !== quickSeq) return;
   quickResults = res;
   lists.quick = quickResults;
-  ul.innerHTML = quickResults.slice(0, 10).map((t, i) => `<li data-act="play" data-list="quick" data-i="${i}"><span class="t">${esc(t.title)}</span><span class="d">${esc(t.duration)}</span><button data-act="qdl" data-i="${i}" title="MP3/MP4로 받기">${ic('download')}</button></li>`).join('') || '<li>결과가 없어요</li>';
+  ul.innerHTML = !res.length ? '<li>찾는 곡이 없어요</li>' : quickResults.slice(0, 10).map((t, i) => `<li data-act="play" data-list="quick" data-i="${i}"><span class="t">${esc(t.title)}</span><span class="d">${esc(t.duration)}</span><button data-act="qdl" data-i="${i}" title="MP3/MP4로 받기">${ic('download')}</button></li>`).join('') || '<li>결과가 없어요</li>';
 });
 
 // ---------- 단축키 ----------
