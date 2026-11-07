@@ -416,7 +416,7 @@
   .tbl.compact { --c-art: minmax(0, 2fr); }
   .tbl.noalb { --c-alb: ; }
   .tbl.nodate { --c-date: ; }
-  .thead, .trk[data-row] { display: grid; grid-template-columns: 16px minmax(0, 4fr) var(--c-art) var(--c-alb) var(--c-date) minmax(120px, 1fr); gap: 16px; padding: 0 16px; align-items: center; }
+  .thead, .trk[data-row], .trk.alb-row { display: grid; grid-template-columns: 16px minmax(0, 4fr) var(--c-art) var(--c-alb) var(--c-date) minmax(120px, 1fr); gap: 16px; padding: 0 16px; align-items: center; }
   .thead { height: 36px; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 16px; color: var(--sub); font-size: 14px; position: sticky; top: 64px; z-index: 3; }
   .thead button { color: var(--sub); text-align: left; display: flex; gap: 4px; align-items: center; font-size: 14px; padding: 0; }
   .thead button:hover, .thead button.on { color: #fff; }
@@ -426,7 +426,20 @@
   .thead .tail .mi { width: 16px; height: 16px; }
   #main.scrolled .thead { background: #1a1a1a; margin-left: -24px; margin-right: -24px; padding-left: 40px; padding-right: 40px; border-bottom-color: rgba(255,255,255,.1); }
   .trk { color: var(--sub); font-size: 14px; border-radius: 4px; }
-  .trk[data-row] { height: 56px; }
+  .trk[data-row], .trk.alb-row { height: 56px; }
+  .trk.alb-row:hover { background: var(--hov); }
+  .trk.alb-row:not(.alb-miss):hover .num { visibility: hidden; }
+  .trk.alb-row:not(.alb-miss):hover .rp { display: grid; }
+  .trk.alb-miss { opacity: .45; }
+  .tbl .disc { color: var(--sub); font-size: 14px; font-weight: 700; padding: 16px 16px 8px; }
+  .c-alb a { color: inherit; }
+  .c-alb a:hover { text-decoration: underline; }
+  .alb-end { padding: 24px 24px 8px; color: var(--sub); font-size: 14px; }
+  .alb-copy { font-size: 11px; margin-top: 4px; }
+  .disco .chips { margin-bottom: 16px; }
+  .bio-card { max-width: 672px; border-radius: 8px; overflow: hidden; background: var(--hov); }
+  .bio-card img { display: block; width: 100%; max-height: 400px; object-fit: cover; object-position: center 25%; }
+  .bio-card p { margin: 0; padding: 24px; color: var(--sub); font-size: 16px; line-height: 1.5; }
   .trk[data-row]:hover { background: var(--hov); }
   .trk.sel, .trk.sel:hover { background: rgba(255,255,255,.3) !important; color: #fff; }
   .trk.dropb { box-shadow: 0 -2px 0 var(--acc); }
@@ -877,6 +890,8 @@ const CONFIG = {
   searchUrl: '/api/search',
   // 가사: 러버블 서버가 로그인을 확인하고 LRCLIB에서 찾아 온다 (lovable/src/lib/lyrics-proxy.ts)
   lyricsUrl: '/api/lyrics',
+  // 앨범, 표지, 가수 사진: 러버블 서버가 애플 음악 자료와 위키백과에서 가져온다 (lovable/src/lib/album-proxy.ts)
+  albumUrl: '/api/album',
   invidious: 'https://yt.chocolatemoo53.com',
   // 이 컴퓨터에서 도는 다운로드 서버 (~/stealth-music/dl)
   dlUrl: 'http://localhost:8790',
@@ -889,14 +904,20 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // 음악 화면 아이콘 (위 SVG의 m-*)
 const ic = name => `<svg class="mi" aria-hidden="true"><use href="#m-${name}"/></svg>`;
-const thumb = id => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`;
-const thumbBig = id => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/maxresdefault.jpg`;
+const ytThumb = id => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`;
+const ytBig = id => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/maxresdefault.jpg`;
+// 앨범을 찾은 곡은 앨범 표지를 쓴다. 영상 화면은 영상 그림 그대로
+const videoScreen = () => route.name === 'video' || route.name === 'vsearch' || (route.name === 'liked' && route.id === 'video');
+const thumb = id => (!videoScreen() && store.albums[id]?.c) || ytThumb(id);
+const thumbBig = id => (!videoScreen() && store.albums[id]?.c?.replace('/300x300bb.', '/600x600bb.')) || ytBig(id);
+const ALBUM_GAP = 3000, ALBUM_REST = 300000;
+let albumWait = [], albumBusy = false, albumRest = 0, albumPaintT = 0;
 const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 
 // ---------- 저장소 ----------
 const KEY = 'sm.v1';
 const STORE_MAX = 4500000; // 브라우저 저장 공간은 글자 약 500만 개
-const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, smart: false, panel: 'now', doc: null, settings: {}, following: [], folders: [], searches: [], pins: ['liked'], played: {}, lib: {}, lyricShift: {}, lyricPick: {}, albums: {}, noArtist: [] });
+const defaults = () => ({ liked: [], disliked: [], video: { liked: [], disliked: [], stats: {}, recent: [] }, playlists: [], recent: [], stats: {}, volume: 70, repeat: 'off', shuffle: false, smart: false, panel: 'now', doc: null, settings: {}, following: [], folders: [], searches: [], pins: ['liked'], played: {}, lib: {}, lyricShift: {}, lyricPick: {}, albums: {}, savedAlbums: [], noArtist: [] });
 // 이 브라우저에 저장된 게 하나도 없으면 처음 온 사람 (첫 방문 안내용)
 const FIRST_VISIT = (() => { try { return !localStorage.getItem(KEY); } catch (e) { return false; } })();
 const store = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign(defaults(), s); } catch (e) {} return defaults(); })();
@@ -1359,6 +1380,7 @@ function playCurrent() {
   const t = current();
   if (!t) return;
   counted = false; loopPlays = 0;
+  pumpAlbums();
   if (playerReady) player.loadVideoById(t.id); else pendingId = t.id;
   if (!store.settings.privateSession) {
     const B = bucket();
@@ -1971,8 +1993,8 @@ function plArt(p, cls = 'pic') {
 
 // 표지 색으로 머리 영역을 칠한다 (썸네일은 CORS가 열려 있어서 캔버스로 읽을 수 있다)
 const colorCache = new Map();
-function coverColor(id) {
-  if (colorCache.has(id)) return colorCache.get(id);
+function coverColor(id, src = thumb(id)) {
+  if (colorCache.has(src)) return colorCache.get(src);
   const p = new Promise(res => {
     const im = new Image();
     im.crossOrigin = 'anonymous';
@@ -1985,17 +2007,17 @@ function coverColor(id) {
       } catch (e) { res(null); }
     };
     im.onerror = () => res(null);
-    im.src = thumb(id);
+    im.src = src;
   });
-  colorCache.set(id, p);
+  colorCache.set(src, p);
   return p;
 }
 const seedColor = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) % 360; return `hsl(${h} 40% 30%)`; };
 let heroSeq = 0;
-function setHero(id, seed) {
+function setHero(id, seed, src) {
   const el = $('#main'), seq = ++heroSeq;
   el.style.setProperty('--hc', seedColor(seed ?? id ?? ''));
-  if (id) coverColor(id).then(c => { if (c && seq === heroSeq) el.style.setProperty('--hc', c); });
+  if (id) coverColor(id, src).then(c => { if (c && seq === heroSeq) el.style.setProperty('--hc', c); });
 }
 
 // 목록마다 정렬·찾기 상태
@@ -2006,12 +2028,13 @@ function viewList(key, arr) {
   return q ? out.filter(t => { const m = meta(t); return (m.title + ' ' + m.artist).toLowerCase().includes(q); }) : out;
 }
 const albumName = t => store.albums[t.id]?.n || '';
+const albumCell = t => { const a = store.albums[t.id]; return a?.id ? `<a data-act="go" data-route="album" data-id="${esc(a.id)}">${esc(a.n)}</a>` : esc(albumName(t)); };
 function trackRow(key, t, i, o) {
   const m = meta(t), k = esc(key), on = isLiked(t.id, listKind(key));
   return `<div class="trk${isCur(t) ? ' cur' : ''}" data-row data-id="${esc(t.id)}" data-list="${k}" data-i="${i}" draggable="true">
-    <span class="n"><span class="num">${i + 1}</span><button class="rp" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>
-    <div class="tt"><img src="${thumb(t.id)}" loading="lazy" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div>
-    ${store.settings.compact ? `<span class="c-art">${artistLink(m.artist)}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${esc(albumName(t))}</span>`}${o.date ? `<span class="c-date">${esc(dateText(t.at))}</span>` : ''}
+    <span class="n"><span class="num">${o.no ?? i + 1}</span><button class="rp" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>
+    <div class="tt">${o.pic === false ? '' : `<img src="${thumb(t.id)}" loading="lazy" alt="">`}<div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div>
+    ${store.settings.compact ? `<span class="c-art">${artistLink(m.artist)}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${albumCell(t)}</span>`}${o.date ? `<span class="c-date">${esc(dateText(t.at))}</span>` : ''}
     <div class="tail"><button class="like${on ? ' on' : ''}" data-act="like" data-list="${k}" data-i="${i}" title="${on ? '좋아요 취소' : '좋아요'}">${ic(on ? 'check-circle' : 'add-circle')}</button><span class="c-dur">${esc(t.duration || '')}</span><button class="more" data-act="more" data-list="${k}" data-i="${i}" title="더보기">${ic('more')}</button></div>
   </div>`;
 }
@@ -2019,11 +2042,12 @@ function trackTable(key, arr, o = {}) {
   const list = o.raw ? arr : viewList(key, arr), v = viewOf(key);
   lists[key] = list;
   if (!list.length) return `<div class="tbl"><p class="m-hint">${v.q ? '찾는 곡이 없어요' : o.empty || '곡이 없어요'}</p></div>`;
-  o = { ...o, album: o.album !== false && list.some(albumName) };
+  const wanted = o.album !== false;
+  o = { ...o, album: wanted && list.some(albumName) };
   const col = (by, label) => `<button class="${v.by === by ? 'on' : ''}" data-act="sortcol" data-list="${esc(key)}" data-col="${by}">${label}${v.by === by ? ic(v.dir > 0 ? 'up' : 'down') : ''}</button>`;
   const head = o.head === false ? '' : `<div class="thead"><span class="n">#</span>${col('title', '제목')}${store.settings.compact ? `<span class="c-art">${col('artist', '아티스트')}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${col('album', '앨범')}</span>`}${o.date ? `<span class="c-date">${col('added', '추가한 날짜')}</span>` : ''}<span class="tail">${ic('clock')}</span></div>`;
   const rows = (o.limit ? list.slice(0, o.limit) : list).map((t, i) => trackRow(key, t, i, o)).join('');
-  return `<div class="tbl${o.date ? '' : ' nodate'}${o.album === false ? ' noalb' : ''}${store.settings.compact ? ' compact' : ''}">${head}${rows}</div>`;
+  return `<div class="tbl${o.date ? '' : ' nodate'}${o.album === false ? ' noalb' : ''}${store.settings.compact ? ' compact' : ''}"${wanted && !o.album ? ' data-albyet' : ''}>${head}${rows}</div>`;
 }
 const stickBar = (title, key) => `<div class="stick"><button class="bigplay sm" data-act="playall" data-list="${esc(key)}" title="재생">${ic('play')}</button><span class="stick-t">${esc(title)}</span></div>`;
 const listFindBtn = key => `<button data-act="listfind" data-list="${esc(key)}" title="이 목록에서 찾기">${ic('search')}</button>`;
@@ -2045,6 +2069,7 @@ function actBar(key, o = {}) {
 const cardTrack = (key, t, i) => { const m = meta(t), k = esc(key); return `<div class="card" data-act="play" data-list="${k}" data-i="${i}" data-ctx="track"><div class="art"><img src="${thumb(t.id)}" alt="" loading="lazy"><button class="cplay" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button></div><div class="t1">${esc(m.title)}</div><div class="t2">${esc(m.artist)}</div></div>`; };
 const cardPlaylist = p => `<div class="card" data-act="go" data-route="playlist" data-id="${p.id}" data-ctx="pl:${p.id}"><div class="art">${plArt(p)}${p.tracks.length ? `<button class="cplay" data-act="playpl" data-id="${p.id}" title="재생">${ic('play')}</button>` : ''}</div><div class="t1">${esc(p.name)}</div><div class="t2">${esc(p.desc || `${myName()} · ${p.tracks.length}곡`)}</div></div>`;
 const cardArtist = a => `<div class="card round" data-act="artist" data-id="${esc(a.name)}" data-ctx="ar:${esc(a.name)}"><div class="art">${a.t ? `<img src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`}<button class="cplay" data-act="playartist" data-id="${esc(a.name)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(a.name)}</div><div class="t2">아티스트</div></div>`;
+const cardAlbum = a => `<div class="card" data-act="go" data-route="album" data-id="${esc(a.id)}" data-ctx="al:${esc(a.id)}"><div class="art">${a.c ? `<img src="${esc(a.c)}" alt="" loading="lazy">` : `<span class="pic">${ic('note')}</span>`}<button class="cplay" data-act="playalbum" data-id="${esc(a.id)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(albumTitle(a.n))}</div><div class="t2">${esc([a.y, albumKind(a.n)].filter(Boolean).join(' · '))}</div></div>`;
 const cardMix = x => `<div class="card" data-act="radio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" data-sub="${esc(x.sub)}"><div class="art"><img src="${thumb(x.seed.id)}" alt="" loading="lazy"><button class="cplay" data-act="playradio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(x.label)}</div><div class="t2">${esc(x.sub)}</div></div>`;
 const shelf = (title, inner, more) => `<section class="shelf"><div class="shelf-h"><h2>${more ? `<a data-act="go" data-route="shelf" data-id="${more}">${esc(title)}</a>` : esc(title)}</h2>${more ? `<a class="more" data-act="go" data-route="shelf" data-id="${more}">모두 표시</a>` : ''}</div><div class="row1">${inner}</div></section>`;
 
@@ -2144,11 +2169,16 @@ function renderSearch(el) {
   const res = s.results;
   const artists = [];
   for (const t of res) { const name = meta(t).artist; if (name && !artists.some(a => sameArtist(a.name, name))) artists.push({ name, t }); }
-  const chips = `<div class="chips search-chips">${[['all', '모두'], ['songs', '곡'], ['artists', '아티스트']].map(([k, l]) => `<button class="chip${searchTab === k ? ' on' : ''}" data-act="searchchip" data-id="${k}">${l}</button>`).join('')}</div>`;
+  const chips = `<div class="chips search-chips">${[['all', '모두'], ['songs', '곡'], ['artists', '아티스트'], ['albums', '앨범']].map(([k, l]) => `<button class="chip${searchTab === k ? ' on' : ''}" data-act="searchchip" data-id="${k}">${l}</button>`).join('')}</div>`;
   if (!res.length) { lists.search = []; el.innerHTML = `<div class="pad s-empty"><h2>'${esc(s.q)}'에 대한 검색 결과가 없습니다</h2><p class="m-hint">철자를 확인하거나 다른 검색어를 사용해 보세요.</p></div>`; return; }
   let body;
   if (searchTab === 'songs') body = trackTable('search', res);
   else if (searchTab === 'artists') { lists.search = res; body = `<div class="gridall">${artists.map(cardArtist).join('')}</div>`; }
+  else if (searchTab === 'albums') {
+    lists.search = res;
+    const found = albumsFor(s.q);
+    body = !found ? '<p class="m-hint">불러오는 중…</p>' : found.length ? `<div class="gridall">${found.map(cardAlbum).join('')}</div>` : '<p class="m-hint">찾는 앨범이 없어요</p>';
+  }
   else {
     // 맨 위 띠: 검색어가 가수 이름이면 가수, 아니면 첫 곡. 그 아래는 곡과 가수가 섞인 한 줄 목록
     lists.search = res;
@@ -2240,6 +2270,227 @@ function renderFolder(el, r) {
 
 // 아티스트: 곡 정보만 있어서 검색 결과와 내 기록으로 만든다
 const artistData = new Map();
+// 앨범 자료. YouTube에는 앨범이 없어서 러버블을 거쳐 애플 음악 자료에서 찾는다
+async function albumApi(body) {
+  const r = await fetch(CONFIG.albumUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('album ' + r.status);
+  return r.json();
+}
+const albumTitle = n => String(n ?? '').replace(/\s+-\s+(?:Single|EP)$/i, '');
+const albumKind = n => (/\s-\s+Single$/i.test(n) ? '싱글' : /\s-\s+EP$/i.test(n) ? 'EP' : '앨범');
+const coverOk = c => (/^https:\/\/[\w.-]+\.mzstatic\.com\/[\w\-./%]+$/.test(c || '') ? c : '');
+const albumRecord = h => ({ n: albumTitle(h.n), id: h.id, aid: h.aid, c: coverOk(h.c), y: h.y, no: h.no, disc: h.disc });
+const VERSION_TITLE = /\b(?:inst(?:rumental)?|karaoke|live)\b|\bMR\b|노래방|반주|라이브/i, VERSION_ALBUM = /\b(?:karaoke|live)\b|노래방|반주|라이브|콘서트/i;
+// 곡 이름과 가수가 같으면 가장 믿고, 이름이 번역돼 다르면 길이로 본다. 원곡이 아닌 판(반주, 라이브)은 곡 자체가 그런 곡일 때만
+function pickAlbum(t, results) {
+  const m = meta(t), secs = t.seconds || 0;
+  let best = null, top = 0;
+  for (const r of results) {
+    if (!VERSION_TITLE.test(m.title) && (VERSION_TITLE.test(r.t) || VERSION_ALBUM.test(r.n))) continue;
+    const artist = sameArtist(m.artist, r.a) || sameArtist(m.artist, String(r.a).split(/\s*[&,]\s*/)[0]), title = sameArtist(m.title, r.t), gap = secs && r.ms ? Math.abs(secs - r.ms / 1000) : Infinity;
+    const score = artist && title ? 3 : (artist || title) && gap <= 5 ? 2 : gap <= 3 ? 1 : 0;
+    if (score > top) { top = score; best = r; }
+  }
+  return best;
+}
+const albumNeeded = t => !!t && !store.albums[t.id] && t.channel !== LINK_CHANNEL && !!meta(t).title;
+// 화면에 보이는 곡만, 천천히 하나씩 찾는다. 찾은 결과는 없었던 것까지 저장해서 다시 묻지 않는다
+function wantAlbums() {
+  if (mode !== 'music' || videoScreen()) { albumWait = []; return; }
+  const out = new Map();
+  for (const el of document.querySelectorAll('#main .trk[data-row], #main .card[data-list][data-i], #main .top[data-list]')) {
+    const t = lists[el.dataset.list]?.[+el.dataset.i];
+    if (albumNeeded(t)) out.set(t.id, t);
+  }
+  albumWait = [...out.values()];
+  pumpAlbums();
+}
+async function pumpAlbums() {
+  if (albumBusy || Date.now() < albumRest) return;
+  const cur = mode === 'music' && !videoScreen() ? current() : null, t = albumNeeded(cur) ? cur : albumWait.find(albumNeeded);
+  if (!t) return;
+  albumBusy = true;
+  const m = meta(t);
+  try {
+    const j = await albumApi({ action: 'song', term: `${m.artist} ${m.title}`.trim().slice(0, 200) });
+    const hit = pickAlbum(t, j.results || []);
+    store.albums[t.id] = hit ? albumRecord(hit) : {};
+    save();
+    if (hit) albumFound(t.id);
+  } catch (e) {
+    // 자료 쪽이 막으면 한동안 쉰다. 틀린 값을 저장하지 않는다
+    albumRest = Date.now() + ALBUM_REST; albumWait = []; albumBusy = false;
+    return;
+  }
+  setTimeout(() => { albumBusy = false; pumpAlbums(); }, ALBUM_GAP);
+}
+// 다시 그리지 않고 그림과 앨범 칸만 바꾼다. 표에 앨범 열이 아직 없을 때만 다시 그린다
+function albumFound(id) {
+  for (const im of document.querySelectorAll('img')) {
+    if (im.src === ytThumb(id)) im.src = thumb(id);
+    else if (im.src === ytBig(id)) { delete im.dataset.big; im.src = thumbBig(id); }
+  }
+  const rows = [...document.querySelectorAll('#main .trk[data-row]')].filter(r => r.dataset.id === id);
+  if (rows.some(r => r.closest('[data-albyet]'))) paintAlbumsSoon();
+  else for (const r of rows) { const c = r.querySelector('.c-alb'); if (c) c.innerHTML = albumCell({ id }); }
+}
+function paintAlbumsSoon() {
+  clearTimeout(albumPaintT);
+  albumPaintT = setTimeout(() => {
+    const a = document.activeElement;
+    if (drag || (a?.matches('input, textarea') && $('#main').contains(a))) return paintAlbumsSoon();
+    renderMain();
+  }, 300);
+}
+
+// 앨범 화면
+const albumShown = new Map(), albumLoads = new Map();
+function loadAlbum(id) {
+  if (albumLoads.has(id)) return albumLoads.get(id);
+  const p = albumApi({ action: 'album', id: +id }).then(r => (r.album ? { album: r.album, tracks: r.tracks || [] } : null)).catch(() => null).then(d => {
+    if (!d) albumLoads.delete(id);
+    albumShown.set(id, d);
+    return d;
+  });
+  albumLoads.set(id, p);
+  return p;
+}
+const knownTrack = id => store.stats[id]?.t || store.liked.find(t => t.id === id) || store.playlists.flatMap(p => p.tracks).find(t => t.id === id);
+function ownAlbumTrack(albumId, x) {
+  for (const [id, a] of Object.entries(store.albums)) if (a.id === albumId && a.no === x.no && (a.disc || 1) === (x.disc || 1)) { const t = knownTrack(id); if (t) return t; }
+  return null;
+}
+// 길이가 맞는 영상이 먼저, 없으면 이름이 같은 영상. 둘 다 없으면 다른 곡을 틀지 않고 못 찾은 곡으로 둔다
+function pickVideo(x, results) {
+  const ok = results.filter(t => VERSION_TITLE.test(x.t) || !VERSION_TITLE.test(t.title)), want = x.ms / 1000;
+  return ok.find(t => t.seconds && Math.abs(t.seconds - want) <= 5) || ok.find(t => sameArtist(meta(t).title, x.t)) || null;
+}
+function findAlbumSong(d, x) {
+  if (x.yt !== undefined) return Promise.resolve(x.yt);
+  return x.finding || (x.finding = (async () => {
+    let t = ownAlbumTrack(d.album.id, x);
+    if (!t) {
+      const v = pickVideo(x, await search(`${x.a} ${x.t}`, { backup: false, link: false }).catch(() => []));
+      if (v) t = { id: v.id, title: `${x.a} - ${x.t}`, channel: x.a, duration: fmt(x.ms / 1000), seconds: Math.round(x.ms / 1000) };
+    }
+    if (t && !store.albums[t.id]?.n) { store.albums[t.id] = albumRecord({ ...x, n: d.album.n, id: d.album.id, aid: d.album.aid, c: d.album.c, y: d.album.y }); save(); }
+    x.yt = t;
+    return t;
+  })());
+}
+const albumFoundList = d => d.tracks.filter(x => x.yt).map(x => x.yt);
+// 앨범을 듣는 중이면 찾은 곡을 뒤에 이어 붙인다
+function albumTick(d, x) {
+  const key = 'al:' + d.album.id;
+  lists[key] = albumFoundList(d);
+  if (x.yt && Q.ctx?.key === key && !Q.list.some(t => t.id === x.yt.id)) { const s = slim(x.yt); Q.list.push(s); Q.base?.push(s); renderQueue(); }
+  if (route.name === 'album' && String(route.id) === String(d.album.id)) paintAlbumsSoon();
+}
+async function resolveAlbum(d) {
+  if (d.running) return;
+  d.running = true;
+  const key = 'al:' + d.album.id, wanted = () => (route.name === 'album' && String(route.id) === String(d.album.id)) || Q.ctx?.key === key;
+  for (const x of d.tracks) {
+    if (x.yt !== undefined) continue;
+    if (!wanted()) break;
+    await findAlbumSong(d, x);
+    albumTick(d, x);
+  }
+  d.running = false;
+}
+async function playAlbum(id) {
+  const d = await loadAlbum(id);
+  if (!d) return toast('앨범을 불러오지 못했어요');
+  let first = null;
+  for (const x of d.tracks) if ((first = await findAlbumSong(d, x))) break;
+  if (!first) return toast('이 앨범의 곡을 찾지 못했어요');
+  const key = 'al:' + id;
+  lists[key] = albumFoundList(d);
+  playList(lists[key], ctxOf(key));
+  resolveAlbum(d);
+}
+async function playAlbumSong(id, i) {
+  const d = albumShown.get(id), x = d?.tracks[i];
+  if (!x) return;
+  const t = await findAlbumSong(d, x);
+  if (!t) { toast('이 곡을 찾지 못했어요'); return renderMain(); }
+  const key = 'al:' + id;
+  lists[key] = albumFoundList(d);
+  renderMain();
+  playFrom(key, lists[key].indexOf(t));
+}
+function toggleAlbumSave(id) {
+  const i = store.savedAlbums.findIndex(a => String(a.id) === id), a = albumShown.get(id)?.album;
+  if (i >= 0) store.savedAlbums.splice(i, 1);
+  else if (a) store.savedAlbums.unshift({ id: a.id, n: albumTitle(a.n), a: a.a, c: coverOk(a.c), at: Date.now() });
+  else return;
+  toast(i >= 0 ? '내 라이브러리에서 삭제했어요' : '내 라이브러리에 추가했어요');
+  save(); renderLib();
+  if (route.name === 'album') renderMain();
+}
+const dateKo = s => { const [y, m, d] = String(s).split('-').map(Number); return y && m && d ? `${y}년 ${m}월 ${d}일` : ''; };
+const albumRow = (id, x, i) => `<div class="trk alb-row${x.yt === null ? ' alb-miss' : ''}"><span class="n"><span class="num">${x.no}</span>${x.yt === null ? '' : `<button class="rp" data-act="albplay" data-id="${esc(id)}" data-i="${i}" title="재생">${ic('play')}</button>`}</span><div class="tt"><div class="tx"><div class="t1">${esc(x.t)}</div><div class="t2">${esc(x.a)}</div></div></div><div class="tail"><span class="c-dur">${fmt(x.ms / 1000)}</span></div></div>`;
+function renderAlbum(el, r) {
+  const id = String(r.id), key = 'al:' + id, d = albumShown.get(id);
+  if (d === undefined) {
+    el.innerHTML = '<div class="pad"><p class="m-hint">불러오는 중…</p></div>';
+    loadAlbum(id).then(() => { if (route.name === 'album' && String(route.id) === id) renderMain(); });
+    return;
+  }
+  if (!d) {
+    el.innerHTML = `<div class="pad"><p class="m-hint">앨범을 불러오지 못했어요</p><button class="pill" data-act="albretry" data-id="${esc(id)}">다시 시도</button></div>`;
+    return;
+  }
+  const a = d.album, title = albumTitle(a.n), total = d.tracks.reduce((s, x) => s + x.ms, 0) / 1000, saved = store.savedAlbums.some(x => String(x.id) === id);
+  lists[key] = albumFoundList(d);
+  const discs = d.tracks.some(x => x.disc > 1);
+  let found = 0, disc = 0;
+  const rows = d.tracks.map((x, i) => (discs && x.disc !== disc ? `<div class="disc">디스크 ${disc = x.disc}</div>` : '') + (x.yt ? trackRow(key, x.yt, found++, { album: false, pic: false, no: x.no }) : albumRow(id, x, i))).join('');
+  const others = (discoOf(a.a, a.aid)?.albums || []).filter(x => String(x.id) !== id).slice(0, 8);
+  el.innerHTML = stickBar(title, key) + `
+    <div class="hero">${a.c ? `<img class="art" src="${esc(a.c)}" alt="">` : `<div class="art">${ic('note')}</div>`}<div class="hero-t"><div class="hero-type">${albumKind(a.n)}</div><h1>${esc(title)}</h1><div class="hero-sub"><a data-act="artist" data-id="${esc(a.a)}"><b>${esc(a.a)}</b></a>${a.y ? ` • ${esc(a.y)}` : ''} • ${a.count || d.tracks.length}곡${total ? `, ${longTime(total)}` : ''}</div></div></div>
+    <div class="below">${actBar(key, { more: 'albmore', id, find: false, extra: `<button class="ab${saved ? ' on' : ''}" data-act="albsave" data-id="${esc(id)}" title="${saved ? '내 라이브러리에서 삭제' : '내 라이브러리에 저장하기'}">${ic(saved ? 'check-circle' : 'add-circle')}</button>` })}
+    <div class="tbl noalb nodate"><div class="thead"><span class="n">#</span><span>제목</span><span class="tail">${ic('clock')}</span></div>${rows}</div>
+    <div class="alb-end">${a.date ? `<div>${esc(dateKo(a.date))}</div>` : ''}${a.copy ? `<div class="alb-copy">${esc(a.copy)}</div>` : ''}</div>
+    ${others.length ? `<div class="sec">${shelf(`${a.a}의 곡 더 보기`, others.map(cardAlbum).join(''))}</div>` : ''}</div>`;
+  setHero(key, title, a.c);
+  resolveAlbum(d);
+}
+
+// 가수의 앨범, 사진, 소개. 이름이 같은 다른 가수를 잘못 가져오지 않게 영어끼리는 이름이 같아야 믿는다
+const nonLatin = s => /[^\x00-\x7f]/.test(s);
+const trustedArtist = (name, found) => !!found && (sameArtist(name, found) || nonLatin(name) !== nonLatin(found));
+function tidyAlbums(list = []) {
+  const seen = new Set();
+  return list.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).filter(a => { const k = artistKey(albumTitle(a.n)) + a.y; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+const discoShown = new Map();
+function discoOf(name, id) {
+  const k = String(id || name);
+  if (discoShown.has(k)) return discoShown.get(k);
+  discoShown.set(k, null);
+  albumApi({ action: 'artist', name, ...(id ? { id } : {}) }).then(r => (id || trustedArtist(name, r.artist?.name) ? { albums: tidyAlbums(r.albums), photo: r.photo || '', bio: r.bio || '' } : null)).catch(() => null).then(v => {
+    discoShown.set(k, v);
+    if (v && (route.name === 'artist' || route.name === 'album')) renderMain();
+  });
+  return null;
+}
+const albumFinds = new Map();
+function albumsFor(q) {
+  if (!albumFinds.has(q)) {
+    albumFinds.set(q, null);
+    albumApi({ action: 'albums', term: q }).then(r => tidyAlbums(r.albums)).catch(() => []).then(v => { albumFinds.set(q, v); if (route.name === 'search') renderMain(); });
+  }
+  return albumFinds.get(q);
+}
+const cssUrl = u => u.replace(/[()'"\s]/g, c => '%' + c.charCodeAt(0).toString(16));
+let discoTab = 'all', discoFor = '';
+function discoSection(albums) {
+  const shown = albums.filter(a => discoTab === 'all' || (discoTab === 'album') === (albumKind(a.n) === '앨범'));
+  const tabs = [['all', '인기 릴리스'], ['album', '앨범'], ['single', '싱글 및 EP']].map(([k, l]) => `<button class="chip${discoTab === k ? ' on' : ''}" data-act="discotab" data-id="${k}">${l}</button>`).join('');
+  return `<div class="sec disco"><h2>디스코그래피</h2><div class="chips">${tabs}</div><div class="row1">${shown.slice(0, 12).map(cardAlbum).join('') || '<p class="m-hint">없어요</p>'}</div></div>`;
+}
+
 function loadArtist(name) {
   if (artistData.has(name)) return artistData.get(name);
   const p = search(name, { backup: false, link: false }).then(r => {
@@ -2269,11 +2520,15 @@ function renderArtist(el, r) {
   const seed = top[0], more = artistMore.has(name), following = isFollowing(name), mix = seed && mixSeen.get(seed.id);
   if (seed && !mix) fetchMix(seed.id).then(m => { if (m.length) { mixSeen.set(seed.id, m); if (route.name === 'artist' && route.id === name) renderMain(); } });
   const like = similarArtists(name, mix || []);
+  if (discoFor !== name) { discoFor = name; discoTab = 'all'; }
+  const disco = discoOf(name, mine.map(t => store.albums[t.id]?.aid).find(Boolean)), photo = disco?.photo || (seed ? thumbBig(seed.id) : '');
   el.innerHTML = stickBar(name, key) + `
-    <div class="hero artist" ${seed ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${thumbBig(seed.id)})"` : ''}><div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(name)}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
+    <div class="hero artist" ${photo ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${esc(cssUrl(photo))})"` : ''}><div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(name)}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
     <div class="below">${actBar(key, { more: 'armore', id: name, find: false, extra: `<button class="pill" data-act="follow" data-id="${esc(name)}">${following ? '팔로잉' : '팔로우하기'}</button>` })}
     <div class="sec"><h2>인기</h2>${d ? trackTable(key, top, { head: false, album: false, limit: more ? 20 : 5, empty: '이 아티스트의 곡을 찾지 못했어요' }) : '<p class="m-hint">불러오는 중…</p>'}${d && top.length > 5 ? `<button class="showmore" data-act="armoretoggle" data-id="${esc(name)}">${more ? '간단히 보기' : '자세히 보기'}</button>` : ''}</div>
     ${mine.length ? `<div class="sec"><h2>내가 들은 곡</h2>${trackTable('mine:' + name, mine, { head: false, album: false, limit: 5 })}</div>` : ''}
+    ${disco?.albums.length ? discoSection(disco.albums) : ''}
+    ${disco?.bio ? `<div class="sec bio"><h2>상세정보</h2><div class="bio-card">${disco.photo ? `<img src="${esc(disco.photo)}" alt="" loading="lazy">` : ''}<p>${esc(disco.bio)}</p></div></div>` : ''}
     ${like.length ? `<div class="sec">${shelf('비슷한 아티스트', like.slice(0, 12).map(cardArtist).join(''))}</div>` : ''}</div>`;
   setHero(seed?.id, name);
 }
@@ -2392,7 +2647,7 @@ function renderVSearch(el) {
     : `<div class="pad s-empty"><h2>'${esc(s.q)}'에 대한 영상이 없습니다</h2><p class="m-hint">철자를 확인하거나 다른 검색어를 사용해 보세요.</p></div>`;
 }
 
-const PAGES = { home: renderHome, search: renderSearch, vsearch: renderVSearch, liked: renderLiked, playlist: renderPlaylist, folder: renderFolder, artist: renderArtist, radio: renderRadio, shelf: renderShelf, me: renderMe, downloads: renderDownloads, disliked: renderDisliked, settings: renderSettings, video: renderVideo, lyrics: renderLyrics };
+const PAGES = { home: renderHome, search: renderSearch, vsearch: renderVSearch, liked: renderLiked, playlist: renderPlaylist, folder: renderFolder, artist: renderArtist, album: renderAlbum, radio: renderRadio, shelf: renderShelf, me: renderMe, downloads: renderDownloads, disliked: renderDisliked, settings: renderSettings, video: renderVideo, lyrics: renderLyrics };
 let searchState = { q: '', results: [], loading: false, error: '' };
 let vsearchState = { q: '', results: [], loading: false, error: '' }, vsearchTimer = 0, vsearchSeq = 0;
 function renderMain() {
@@ -2401,6 +2656,7 @@ function renderMain() {
   paintSel();
   onMainScroll();
   placePlayer();
+  wantAlbums();
 }
 function onMainScroll() {
   const m = $('#main'), s = m.querySelector('.stick'), hero = m.querySelector('.hero');
@@ -2422,6 +2678,7 @@ function libEntries() {
   }
   for (const f of store.folders) out.push({ key: 'fo:' + f.id, type: 'folder', name: f.name, sub: `플레이리스트 ${store.playlists.filter(p => p.folder === f.id).length}개`, attrs: `data-route="folder" data-id="${f.id}"`, pic: `<span class="pic">${ic('folder')}</span>`, on: route.name === 'folder' && route.id === f.id, at: f.at || 0 });
   for (const a of store.following) out.push({ key: 'ar:' + a.name, type: 'artist', round: true, name: a.name, sub: '아티스트', attrs: `data-route="artist" data-id="${esc(a.name)}"`, pic: a.t ? `<img class="pic" src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`, on: route.name === 'artist' && route.id === a.name, at: a.at || 0 });
+  for (const a of store.savedAlbums) out.push({ key: 'al:' + a.id, type: 'album', name: a.n, sub: `앨범 · ${a.a}`, attrs: `data-route="album" data-id="${esc(a.id)}"`, pic: a.c ? `<img class="pic" src="${esc(a.c)}" alt="" loading="lazy">` : `<span class="pic">${ic('note')}</span>`, on: route.name === 'album' && String(route.id) === String(a.id), at: a.at });
   return out;
 }
 const LIB_SORTS = [['recent', '최근 재생'], ['added', '최근 추가됨'], ['alpha', '사전순']];
@@ -2439,7 +2696,7 @@ function renderLibHead() {
   const L = store.lib, chip = (k, l) => `<button class="chip${L.filter === k ? ' on' : ''}" data-act="libchip" data-id="${k}">${l}</button>`;
   const sortName = (LIB_SORTS.find(s => s[0] === (L.sort || 'recent')) || LIB_SORTS[0])[1];
   $('#lib-head').innerHTML = `<div class="lib-head"><button class="lib-title" data-act="libmin" title="내 라이브러리 접기/펼치기">${ic('library')}<span>내 라이브러리</span></button><span class="lib-btns"><button class="lib-new" data-act="newmenu" title="플레이리스트나 폴더 만들기">${ic('add')}만들기</button><button class="lib-wide" data-act="libwide" title="${libWideOn() ? '좁게 보기' : '넓게 보기'}">${ic(libWideOn() ? 'arrow-l' : 'arrow-r')}</button></span></div>
-    <div class="chips lib-chips">${chip('pl', '플레이리스트')}${chip('artist', '아티스트')}${store.folders.length ? chip('folder', '폴더') : ''}</div>
+    <div class="chips lib-chips">${chip('pl', '플레이리스트')}${chip('artist', '아티스트')}${store.savedAlbums.length ? chip('album', '앨범') : ''}${store.folders.length ? chip('folder', '폴더') : ''}</div>
     <div class="lib-tools">${L.find ? `<div class="lib-find">${ic('search')}<input data-libq value="${esc(L.q || '')}" placeholder="내 라이브러리에서 찾기" spellcheck="false"></div>` : libFindBtn()}<button data-act="libsort" title="정렬·보기 방식">${esc(sortName)}${ic(L.view === 'grid' ? 'grid' : L.view === 'compact' ? 'menu' : 'bullet')}</button></div>`;
 }
 function renderLib() {
@@ -2641,7 +2898,7 @@ function showMenu(anchor, key, i) {
     ${mi('m-queue', 'queue', '재생목록에 추가하기')}
     ${mi('m-next', 'next', '다음에 재생')}
     ${mi('m-dislike', 'thumb-down-o', isDisliked(menuTrack.id, menuKind) ? '싫어요 취소' : '싫어요')}
-    ${many ? '' : `<hr>${mi('m-radio', 'radio', '음악 라디오 보러가기')}${m.artist ? mi('m-artist', 'person', '아티스트로 이동하기') : ''}${mi('m-share', 'link', '곡 링크 복사')}`}
+    ${many ? '' : `<hr>${mi('m-radio', 'radio', '음악 라디오 보러가기')}${m.artist ? mi('m-artist', 'person', '아티스트로 이동하기') : ''}${store.albums[menuTrack.id]?.id ? mi('m-album', 'note', '앨범으로 이동하기') : ''}${mi('m-share', 'link', '곡 링크 복사')}`}
     <hr>${DL_ITEMS}${key === 'now' ? `<hr>${mi('sleepmenu', 'moon', '수면 타이머')}${mi('speedmenu', 'speed', '재생 속도')}` : ''}`;
   placeMenu(anchor);
 }
@@ -2666,6 +2923,14 @@ function showPinMenu(anchor, key) { $('#menu').innerHTML = pinItem(key); placeMe
 function showFolderMenu(anchor, f) {
   menuThing = f;
   $('#menu').innerHTML = `${mi('folderedit', 'edit', '이름 바꾸기', `data-id="${f.id}"`)}${mi('e-delfolder', 'delete', '폴더 삭제')}${pinItem('fo:' + f.id)}`;
+  placeMenu(anchor);
+}
+function showAlbumMenu(anchor, id) {
+  const tracks = lists['al:' + id] || [], a = albumShown.get(id)?.album, n = `data-id="${esc(id)}"`, saved = store.savedAlbums.some(x => String(x.id) === id);
+  menuThing = { tracks }; menuTrack = tracks[0] || null; menuTracks = tracks; menuKey = null; menuIdx = -1; menuKind = 'music';
+  $('#menu').innerHTML = `${a || saved ? mi('albsave', saved ? 'check-circle' : 'add-circle', saved ? '내 라이브러리에서 삭제' : '내 라이브러리에 추가하기', n) : ''}
+    ${tracks.length ? `${mi('m-queue', 'queue', '재생목록에 추가하기')}<button data-act="m-addto">${ic('add')}<span>플레이리스트에 추가하기</span>${ic('chev-r')}</button>${mi('m-radio', 'radio', '아티스트 라디오 보러가기')}<hr>${mi('e-dlall', 'download', '곡 모두 MP3로 받기', 'data-fmt="mp3"')}${mi('e-dlall', 'download', '곡 모두 MP4로 받기', 'data-fmt="mp4"')}` : ''}
+    ${a ? mi('artist', 'person', '아티스트로 이동하기', `data-id="${esc(a.a)}"`) : ''}<hr>${pinItem('al:' + id)}`;
   placeMenu(anchor);
 }
 function showArtistMenu(anchor, name) {
@@ -2958,6 +3223,7 @@ function ctxOf(key) {
   }
   if (key.startsWith('pl:')) { const p = plById(key.slice(3)); return { key, name: p ? p.name : '플레이리스트', route: { name: 'playlist', id: key.slice(3) } }; }
   if (key.startsWith('ar:')) return { key, name: key.slice(3), route: { name: 'artist', id: key.slice(3) } };
+  if (key.startsWith('al:')) return { key, name: albumTitle(albumShown.get(key.slice(3))?.album?.n) || '앨범', route: { name: 'album', id: key.slice(3) } };
   if (key.startsWith('radio:')) return { key, name: route.label || `${route.title || '곡'} 라디오`, route: { ...route } };
   if (key === 'search') return { key, name: '검색 결과' };
   if (key === 'vsearch') return { key, name: '영상 검색 결과', route: { name: 'vsearch' } };
@@ -3072,6 +3338,7 @@ document.addEventListener('click', e => {
     case 'play': playFrom(key, i); break;
     case 'playall': {
       const l = lists[key], c = ctxOf(key);
+      if (key.startsWith('al:') && !l?.length) { playAlbum(key.slice(3)); break; }
       if (!l || !l.length) break;
       if (Q.ctx && Q.ctx.key === c.key && c.name && current()) togglePlay(); else playList(l, c);
       break;
@@ -3093,6 +3360,13 @@ document.addEventListener('click', e => {
     case 'm-dl': menuTracks.forEach(t => downloadTrack(t, el.dataset.fmt)); hideMenu(); break;
     case 'm-radio': goRadio(menuTrack); hideMenu(); break;
     case 'm-artist': go({ name: 'artist', id: meta(menuTrack).artist }); hideMenu(); break;
+    case 'm-album': go({ name: 'album', id: String(store.albums[menuTrack.id].id) }); hideMenu(); break;
+    case 'albmore': showAlbumMenu(el, id); break;
+    case 'albsave': toggleAlbumSave(id); hideMenu(); break;
+    case 'albplay': playAlbumSong(id, +el.dataset.i); break;
+    case 'albretry': albumShown.delete(id); renderMain(); break;
+    case 'playalbum': playAlbum(id); break;
+    case 'discotab': discoTab = id; renderMain(); break;
     case 'm-share': copyLink(menuTrack); hideMenu(); break;
     case 'dlcur': if (current()) showDlMenu(el); break;
     case 'qdl': showDlMenu(el, lists.quick[i]); break;
@@ -3303,6 +3577,7 @@ document.addEventListener('contextmenu', e => {
   else if (v.startsWith('pl:')) showPlMenu(at, plById(v.slice(3)));
   else if (v.startsWith('ar:')) showArtistMenu(at, v.slice(3));
   else if (v.startsWith('fo:')) showFolderMenu(at, folderById(v.slice(3)));
+  else if (v.startsWith('al:')) showAlbumMenu(at, v.slice(3));
 });
 
 // 끌어다 놓기: 곡을 왼쪽 플레이리스트·좋아요·대기열로, 플레이리스트와 대기열 안에서는 순서 바꾸기
