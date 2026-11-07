@@ -1428,7 +1428,7 @@ function setQueue(list, i, source = 'list', ctx = null) {
   if (ctx?.key) store.played[ctx.key] = Date.now();
   if (ctx?.key !== 'friend') chat.along = '';
   if (store.shuffle) applyShuffle();
-  if (mode === 'music' && !store.panel && store.settings.nowOnPlay !== false && innerWidth > 1000) setPanel('now');
+  if (mode === 'music' && !store.panel && !ctx?.follow && store.settings.nowOnPlay !== false && innerWidth > 1000) setPanel('now');
   playCurrent();
 }
 function playCurrent() {
@@ -3888,6 +3888,8 @@ function paintSug() {
 }
 function openSug(text) {
   const q = text.trim();
+  // 한글 조합이 끝날 때 같은 글자로 입력 이벤트가 또 온다. 고른 줄을 지우지 않는다
+  if (q === sug.q && !$('#m-sug').hidden) return;
   closeSug();
   if (!q || parseId(q) || /^https?:/i.test(q)) return;
   const turn = sug.turn;
@@ -4395,7 +4397,7 @@ function syncAlong() {
   if (!np || chat.now - f.at > 120000) { stopAlong(); autoToast('친구가 듣기를 멈춰서 같이 듣기를 끝냈어요'); return; }
   const pos = np.pos + (np.playing ? (chat.now - f.at) / 1000 : 0);
   if (current()?.id !== np.id) {
-    setQueue([npTrack(np)], 0, 'list', { key: 'friend', name: `${f.name}님과 같이 듣기` });
+    setQueue([npTrack(np)], 0, 'list', { key: 'friend', name: `${f.name}님과 같이 듣기`, follow: true });
     setTimeout(() => { try { player.seekTo(pos + 1, true); } catch (e) {} }, 800);
   } else if (Math.abs(curTime() - pos) > 4) player.seekTo(pos, true);
   if (np.playing !== playing) { if (np.playing) player.playVideo(); else player.pauseVideo(); }
