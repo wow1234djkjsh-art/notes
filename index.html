@@ -434,6 +434,8 @@
   .tbl .disc { color: var(--sub); font-size: 14px; font-weight: 700; padding: 16px 16px 8px; }
   .c-alb a { color: inherit; }
   .c-alb a:hover { text-decoration: underline; }
+  .hero img.art.round { border-radius: 50%; object-fit: cover; object-position: center 20%; }
+  .alb-who { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; }
   .alb-end { padding: 24px 24px 8px; color: var(--sub); font-size: 14px; }
   .alb-copy { font-size: 11px; margin-top: 4px; }
   .disco .chips { margin-bottom: 16px; }
@@ -912,6 +914,7 @@ const thumb = id => (!videoScreen() && store.albums[id]?.c) || ytThumb(id);
 const thumbBig = id => (!videoScreen() && store.albums[id]?.c?.replace('/300x300bb.', '/600x600bb.')) || ytBig(id);
 const ALBUM_GAP = 3000, ALBUM_REST = 300000;
 let albumWait = [], albumBusy = false, albumRest = 0, albumPaintT = 0;
+const albumTried = new Map();
 const fmt = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
 
 // ---------- 저장소 ----------
@@ -1607,7 +1610,14 @@ function meta(t) {
 }
 const artistKey = s => String(s ?? '').toLowerCase().replace(/[\s()\[\]（）.,'’\-_]/g, '');
 // '아이유 (IU)', 'IU(아이유)', 'iu'를 같은 가수로 본다: 괄호 안팎의 이름 중 하나가 같으면 같다
-const artistNames = s => { const v = String(s ?? ''), o = [artistKey(v.replace(BRACKET, ''))]; for (const b of v.match(BRACKET) || []) o.push(artistKey(b)); return o.filter(Boolean); };
+// 'aespa 에스파'처럼 영어 이름과 한글 이름을 나란히 쓴 것도 같다. 'DJ 소다'의 DJ 같은 두 글자 말머리는 이름이 아니다
+const TWO_NAMES = /^([a-z0-9][a-z0-9 .&'’-]{2,})\s+([가-힣][가-힣 ]+)$|^([가-힣][가-힣 ]+)\s+([a-z0-9][a-z0-9 .&'’-]{2,})$/i;
+const artistNames = s => {
+  const v = String(s ?? ''), plain = v.replace(BRACKET, '').trim(), o = [artistKey(plain)], two = TWO_NAMES.exec(plain);
+  for (const b of v.match(BRACKET) || []) o.push(artistKey(b));
+  if (two) o.push(artistKey(two[1] || two[3]), artistKey(two[2] || two[4]));
+  return o.filter(Boolean);
+};
 const sameArtist = (a, b) => { const x = artistNames(a), y = artistNames(b); return x.some(n => y.includes(n)); };
 
 // 라이브·방송·커버 영상은 연주가 음원과 달라서 길이가 같아도 가사 시간이 맞지 않는다.
@@ -2280,15 +2290,33 @@ const albumTitle = n => String(n ?? '').replace(/\s+-\s+(?:Single|EP)$/i, '');
 const albumKind = n => (/\s-\s+Single$/i.test(n) ? '싱글' : /\s-\s+EP$/i.test(n) ? 'EP' : '앨범');
 const coverOk = c => (/^https:\/\/[\w.-]+\.mzstatic\.com\/[\w\-./%]+$/.test(c || '') ? c : '');
 const albumRecord = h => ({ n: albumTitle(h.n), id: h.id, aid: h.aid, c: coverOk(h.c), y: h.y, no: h.no, disc: h.disc });
-const VERSION_TITLE = /\b(?:inst(?:rumental)?|karaoke|live)\b|\bMR\b|노래방|반주|라이브/i, VERSION_ALBUM = /\b(?:karaoke|live)\b|노래방|반주|라이브|콘서트/i;
-// 곡 이름과 가수가 같으면 가장 믿고, 이름이 번역돼 다르면 길이로 본다. 원곡이 아닌 판(반주, 라이브)은 곡 자체가 그런 곡일 때만
+const VERSION_TITLE = /\b(?:inst(?:rumental)?|karaoke|live|ver(?:sion)?|remix|cover)\b|노래방|반주|라이브|커버|엠알/i, VERSION_ALBUM = /\b(?:karaoke|live|cover|piano|music box|orgel)\b|노래방|반주|라이브|콘서트|엠알|오르골/i;
+const isVersion = s => VERSION_TITLE.test(s) || /\bMR\b/.test(s);
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]/;
+const latinName = s => artistNames(s).some(n => /[a-z]/.test(n) && !CJK.test(n));
+// 찾는 말: 쓰여 있는 그대로, 못 찾으면 괄호 속 영어 이름으로 한 번 더 ('뚜두뚜두 (DDU-DU DDU-DU)')
+function albumTerms(m) {
+  const names = s => [String(s).replace(BRACKET, ' '), ...(String(s).match(BRACKET) || []).map(b => b.slice(1, -1))].map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const latin = s => { const n = names(s); return n.find(x => /[a-z]/i.test(x) && !CJK.test(x)) || n[0] || ''; };
+  return [...new Set([`${m.artist} ${m.title}`.trim(), `${latin(m.artist)} ${latin(m.title)}`.trim()])].map(x => x.slice(0, 200));
+}
+// 틀린 앨범을 보여 주느니 안 보여 주는 쪽을 고른다. 실제 49곡으로 잰 규칙이다 (docs/spotify-logged-in-notes.md)
 function pickAlbum(t, results) {
-  const m = meta(t), secs = t.seconds || 0;
-  let best = null, top = 0;
+  const m = meta(t), secs = t.seconds || 0, native = !/[a-z]/i.test(m.title);
+  let best = null, top = 0, first = true;
   for (const r of results) {
-    if (!VERSION_TITLE.test(m.title) && (VERSION_TITLE.test(r.t) || VERSION_ALBUM.test(r.n))) continue;
-    const artist = sameArtist(m.artist, r.a) || sameArtist(m.artist, String(r.a).split(/\s*[&,]\s*/)[0]), title = sameArtist(m.title, r.t), gap = secs && r.ms ? Math.abs(secs - r.ms / 1000) : Infinity;
-    const score = artist && title ? 3 : (artist || title) && gap <= 5 ? 2 : gap <= 3 ? 1 : 0;
+    if (!isVersion(m.title) && (isVersion(r.t) || VERSION_ALBUM.test(r.n))) continue;
+    const artist = sameArtist(m.artist, r.a) || String(r.a).split(/\s*[&,]\s*/).some(x => sameArtist(m.artist, x));
+    const flip = sameArtist(m.artist, r.t), title = flip || sameArtist(m.title, r.t);
+    // 둘 다 영어 이름이 있는데 다르면 다른 가수다. 같은 곡을 부른 커버 앨범이 여기서 걸러진다
+    if (!artist && !flip && latinName(m.artist) && latinName(r.a)) continue;
+    // 가수를 비교할 수 없으면(한글과 영어) 애플이 그 가수를 알아들었는지 본다: 상위 결과가 한 가수로 모여야 한다
+    const known = artist || results.filter(x => x.a === r.a).length >= 2;
+    const over = secs && r.ms ? secs - r.ms / 1000 : NaN, gap = Math.abs(over);
+    let score = artist && title ? 4 : (artist || title) && gap <= 5 ? 3 : known && gap <= 3 ? 2 : 0;
+    // 제목이 번역돼 비교할 수 없을 때: 첫 곡이고, 영상이 앞뒤로 조금 긴 정도면 같은 곡으로 본다
+    if (!score && first && native && known && over >= -8 && over <= (artist ? 40 : 15)) score = 1;
+    first = false;
     if (score > top) { top = score; best = r; }
   }
   return best;
@@ -2312,11 +2340,13 @@ async function pumpAlbums() {
   albumBusy = true;
   const m = meta(t);
   try {
-    const j = await albumApi({ action: 'song', term: `${m.artist} ${m.title}`.trim().slice(0, 200) });
-    const hit = pickAlbum(t, j.results || []);
-    store.albums[t.id] = hit ? albumRecord(hit) : {};
-    save();
-    if (hit) albumFound(t.id);
+    const terms = albumTerms(m), n = albumTried.get(t.id) || 0;
+    const hit = pickAlbum(t, (await albumApi({ action: 'song', term: terms[n] })).results || []);
+    if (hit || n + 1 >= terms.length) {
+      store.albums[t.id] = hit ? albumRecord(hit) : {};
+      save();
+      if (hit) albumFound(t.id);
+    } else albumTried.set(t.id, n + 1);
   } catch (e) {
     // 자료 쪽이 막으면 한동안 쉰다. 틀린 값을 저장하지 않는다
     albumRest = Date.now() + ALBUM_REST; albumWait = []; albumBusy = false;
@@ -2362,7 +2392,7 @@ function ownAlbumTrack(albumId, x) {
 }
 // 길이가 맞는 영상이 먼저, 없으면 이름이 같은 영상. 둘 다 없으면 다른 곡을 틀지 않고 못 찾은 곡으로 둔다
 function pickVideo(x, results) {
-  const ok = results.filter(t => VERSION_TITLE.test(x.t) || !VERSION_TITLE.test(t.title)), want = x.ms / 1000;
+  const ok = results.filter(t => isVersion(x.t) || !isVersion(t.title)), want = x.ms / 1000;
   return ok.find(t => t.seconds && Math.abs(t.seconds - want) <= 5) || ok.find(t => sameArtist(meta(t).title, x.t)) || null;
 }
 function findAlbumSong(d, x) {
@@ -2446,9 +2476,9 @@ function renderAlbum(el, r) {
   const discs = d.tracks.some(x => x.disc > 1);
   let found = 0, disc = 0;
   const rows = d.tracks.map((x, i) => (discs && x.disc !== disc ? `<div class="disc">디스크 ${disc = x.disc}</div>` : '') + (x.yt ? trackRow(key, x.yt, found++, { album: false, pic: false, no: x.no }) : albumRow(id, x, i))).join('');
-  const others = (discoOf(a.a, a.aid)?.albums || []).filter(x => String(x.id) !== id).slice(0, 8);
+  const disco = discoOf(a.a, a.aid), others = (disco?.albums || []).filter(x => String(x.id) !== id).slice(0, 8);
   el.innerHTML = stickBar(title, key) + `
-    <div class="hero">${a.c ? `<img class="art" src="${esc(a.c)}" alt="">` : `<div class="art">${ic('note')}</div>`}<div class="hero-t"><div class="hero-type">${albumKind(a.n)}</div><h1>${esc(title)}</h1><div class="hero-sub"><a data-act="artist" data-id="${esc(a.a)}"><b>${esc(a.a)}</b></a>${a.y ? ` • ${esc(a.y)}` : ''} • ${a.count || d.tracks.length}곡${total ? `, ${longTime(total)}` : ''}</div></div></div>
+    <div class="hero">${a.c ? `<img class="art" src="${esc(a.c)}" alt="">` : `<div class="art">${ic('note')}</div>`}<div class="hero-t"><div class="hero-type">${albumKind(a.n)}</div><h1>${esc(title)}</h1><div class="hero-sub">${disco?.small ? `<img class="alb-who" src="${esc(disco.small)}" alt="">` : ''}<a data-act="artist" data-id="${esc(a.a)}"><b>${esc(a.a)}</b></a>${a.y ? ` • ${esc(a.y)}` : ''} • ${a.count || d.tracks.length}곡${total ? `, ${longTime(total)}` : ''}</div></div></div>
     <div class="below">${actBar(key, { more: 'albmore', id, find: false, extra: `<button class="ab${saved ? ' on' : ''}" data-act="albsave" data-id="${esc(id)}" title="${saved ? '내 라이브러리에서 삭제' : '내 라이브러리에 저장하기'}">${ic(saved ? 'check-circle' : 'add-circle')}</button>` })}
     <div class="tbl noalb nodate"><div class="thead"><span class="n">#</span><span>제목</span><span class="tail">${ic('clock')}</span></div>${rows}</div>
     <div class="alb-end">${a.date ? `<div>${esc(dateKo(a.date))}</div>` : ''}${a.copy ? `<div class="alb-copy">${esc(a.copy)}</div>` : ''}</div>
@@ -2469,7 +2499,7 @@ function discoOf(name, id) {
   const k = String(id || name);
   if (discoShown.has(k)) return discoShown.get(k);
   discoShown.set(k, null);
-  albumApi({ action: 'artist', name, ...(id ? { id } : {}) }).then(r => (id || trustedArtist(name, r.artist?.name) ? { albums: tidyAlbums(r.albums), photo: r.photo || '', bio: r.bio || '' } : null)).catch(() => null).then(v => {
+  albumApi({ action: 'artist', name, ...(id ? { id } : {}) }).then(r => (id || trustedArtist(name, r.artist?.name) ? { albums: tidyAlbums(r.albums), photo: r.photo || '', small: r.small || r.photo || '', wide: !!r.wide, bio: r.bio || '' } : null)).catch(() => null).then(v => {
     discoShown.set(k, v);
     if (v && (route.name === 'artist' || route.name === 'album')) renderMain();
   });
@@ -2521,17 +2551,25 @@ function renderArtist(el, r) {
   if (seed && !mix) fetchMix(seed.id).then(m => { if (m.length) { mixSeen.set(seed.id, m); if (route.name === 'artist' && route.id === name) renderMain(); } });
   const like = similarArtists(name, mix || []);
   if (discoFor !== name) { discoFor = name; discoTab = 'all'; }
-  const disco = discoOf(name, mine.map(t => store.albums[t.id]?.aid).find(Boolean)), photo = disco?.photo || (seed ? thumbBig(seed.id) : '');
+  // 가로로 넓은 사진만 머리에 깐다. 세로 사진은 둥글게 이름 옆에 둔다 (머리 사진이 없는 가수의 모양)
+  const disco = discoOf(name, mine.map(t => store.albums[t.id]?.aid).find(Boolean)), round = disco?.small && !disco.wide ? disco.small : '', photo = disco?.wide ? disco.photo : !round && seed ? thumbBig(seed.id) : '';
   el.innerHTML = stickBar(name, key) + `
-    <div class="hero artist" ${photo ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${esc(cssUrl(photo))})"` : ''}><div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(name)}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
+    <div class="hero${round ? '' : ' artist'}" ${photo ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${esc(cssUrl(photo))})"` : ''}>${round ? `<img class="art round" src="${esc(round)}" alt="">` : ''}<div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(name)}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
     <div class="below">${actBar(key, { more: 'armore', id: name, find: false, extra: `<button class="pill" data-act="follow" data-id="${esc(name)}">${following ? '팔로잉' : '팔로우하기'}</button>` })}
     <div class="sec"><h2>인기</h2>${d ? trackTable(key, top, { head: false, album: false, limit: more ? 20 : 5, empty: '이 아티스트의 곡을 찾지 못했어요' }) : '<p class="m-hint">불러오는 중…</p>'}${d && top.length > 5 ? `<button class="showmore" data-act="armoretoggle" data-id="${esc(name)}">${more ? '간단히 보기' : '자세히 보기'}</button>` : ''}</div>
     ${mine.length ? `<div class="sec"><h2>내가 들은 곡</h2>${trackTable('mine:' + name, mine, { head: false, album: false, limit: 5 })}</div>` : ''}
     ${disco?.albums.length ? discoSection(disco.albums) : ''}
-    ${disco?.bio ? `<div class="sec bio"><h2>상세정보</h2><div class="bio-card">${disco.photo ? `<img src="${esc(disco.photo)}" alt="" loading="lazy">` : ''}<p>${esc(disco.bio)}</p></div></div>` : ''}
+    ${disco?.bio ? `<div class="sec bio"><h2>상세정보</h2><div class="bio-card">${disco.photo ? `<img src="${esc(disco.photo)}" data-alt="${esc(disco.small)}" alt="" loading="lazy">` : ''}<p>${esc(disco.bio)}</p></div></div>` : ''}
     ${like.length ? `<div class="sec">${shelf('비슷한 아티스트', like.slice(0, 12).map(cardArtist).join(''))}</div>` : ''}</div>`;
-  setHero(seed?.id, name);
+  if (round) setHero('ar:' + name, name, round); else setHero(seed?.id, name);
 }
+// 위키미디어는 큰 그림을 429로 막을 때가 있다. 작은 그림으로 바꾸고, 그것도 안 오면 깨진 그림 대신 없앤다
+document.addEventListener('error', e => {
+  const im = e.target;
+  if (!(im instanceof HTMLImageElement) || !im.matches('.bio-card img, .alb-who, .hero img.round')) return;
+  const alt = im.dataset.alt;
+  if (alt && alt !== im.getAttribute('src')) { im.dataset.alt = ''; im.src = alt; } else im.remove();
+}, true);
 // 곡 라디오·내 믹스
 const mixSeen = new Map();
 function renderRadio(el, r) {
