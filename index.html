@@ -1237,6 +1237,8 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 8일', [
+    '재생목록이나 친구 활동을 닫으면 지금 재생 중 화면이 나옴. 지금 재생 중을 직접 닫아 둔 상태에서는 패널이 닫힘',
+    '영상에 유튜브 자동 자막이 안 나옴',
     '곡을 틀면 오른쪽 패널의 표지 자리에 영상이 같이 나옴. 누르면 큰 영상 화면으로 감',
     '가사를 화면을 키우지 않고 오른쪽 패널에서 볼 수 있음. 더 보기로 칸을 늘리면 곡을 따라가고, 줄을 누르면 그 부분으로 감',
     '음악 화면 전체 개편: 재생 바, 곡 표, 재생목록, 대기열, 메뉴, 설정, 프로필의 크기와 색을 다시 맞춤',
@@ -1383,9 +1385,10 @@ window.onYouTubeIframeAPIReady = () => {
         lockIframe();
         if (pendingId) { player.loadVideoById(pendingId); pendingId = null; }
       },
+      onApiChange: noCaptions,
       onStateChange: e => {
         playing = e.data === YT.PlayerState.PLAYING;
-        if (playing) { errorStreak = 0; fillMissingTitle(); if ((store.settings.speed || 1) !== 1) setSpeedQuiet(); }
+        if (playing) { errorStreak = 0; noCaptions(); fillMissingTitle(); if ((store.settings.speed || 1) !== 1) setSpeedQuiet(); }
         if (e.data === YT.PlayerState.ENDED) {
           if (sleep.end) { sleep.end = false; stopAlong(); autoToast('수면 타이머로 멈췄어요'); if (mode === 'music') renderNow(); } else next(true);
         }
@@ -1401,6 +1404,9 @@ window.onYouTubeIframeAPIReady = () => {
   });
 };
 (() => { const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); })();
+
+// 유튜브 자동 자막을 끈다. 자막 기능이 붙는 때가 영상마다 달라서 재생이 시작될 때와 붙을 때 모두 부른다
+function noCaptions() { try { player.setOption('captions', 'track', {}); } catch {} }
 
 function lockIframe() {
   const f = player && player.getIframe && player.getIframe();
@@ -2869,11 +2875,21 @@ function renderRight() {
   placePlayer();
 }
 function setPanel(name) {
-  store.panel = store.panel === name ? '' : name;
+  if (store.panel === name) return closePanel();
+  if (name === 'now') store.nowHidden = false;
+  store.panel = name;
   save();
   if (store.panel === 'queue') renderQueue();
   renderRight();
   if (store.panel === 'friends') chatPoll();
+}
+// 재생목록과 친구 활동은 지금 재생 중 위에 덮이는 화면이라 닫으면 밑의 화면이 보인다.
+// 지금 재생 중을 직접 숨겼거나, 틀고 있는 곡이 없거나, 창이 좁으면 패널을 닫는다.
+function closePanel() {
+  if (store.panel === 'now') store.nowHidden = true;
+  store.panel = store.nowHidden || !current() || innerWidth <= 1000 ? '' : 'now';
+  save();
+  renderRight();
 }
 function nextUp() { return Q.list[Q.i + 1] || (useAuto() ? Q.auto[0] : null) || null; }
 function renderNowView() {
@@ -3627,7 +3643,7 @@ document.addEventListener('click', e => {
     }
     case 'todoc': setMode('doc'); break;
     case 'panel': setPanel(el.dataset.panel); break;
-    case 'panelclose': store.panel = ''; save(); renderRight(); break;
+    case 'panelclose': closePanel(); break;
     case 'lyrics': toggleLyrics(); break;
     case 'bigtab': go({ name: 'lyrics', tab: el.dataset.id }); break;
     case 'bigclose': go(lastRoute); break;
