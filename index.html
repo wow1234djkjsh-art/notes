@@ -598,6 +598,12 @@
   .np-artist .tx { flex: 1; min-width: 0; }
   .np-artist .t1 { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .np-artist .t2 { color: var(--sub); font-size: 13px; }
+  /* 참여한 가수: 한 줄에 한 명, 줄 간격은 스포티파이 크레딧처럼 약 62 */
+  .np-credit { display: flex; align-items: center; gap: 12px; min-height: 62px; }
+  .np-credit .tx { flex: 1; min-width: 0; }
+  .np-credit .t1 { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-credit .t2 { color: var(--sub); font-size: 14px; }
+  .np-credit a, .np-artist .t1 a { color: inherit; }
   .q-sec { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 18px 0 6px; }
   .q-sec:first-child { margin-top: 14px; }
   .q-sec h4 { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -1236,6 +1242,11 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 9일', [
+    '여러 가수가 함께 부른 곡은 가수 이름이 한 명씩 나뉘어 나오고, 이름마다 눌러서 그 가수 화면으로 갈 수 있음',
+    '지금 재생 중에 참여한 가수 목록이 나오고, 한 명씩 팔로우할 수 있음. 피처링한 가수도 함께 나옴',
+    '함께 부른 곡이 참여한 가수 각자의 화면과 자주 들은 아티스트에 들어감',
+  ]],
   ['11월 8일', [
     '재생목록이나 친구 활동을 닫으면 지금 재생 중 화면이 나옴. 지금 재생 중을 직접 닫아 둔 상태에서는 패널이 닫힘',
     '영상에 유튜브 자동 자막이 안 나옴',
@@ -1699,6 +1710,53 @@ const artistNames = s => {
   return o.filter(Boolean);
 };
 const sameArtist = (a, b) => { const x = artistNames(a), y = artistNames(b); return x.some(n => y.includes(n)); };
+// 단체곡과 피처링: 가수 줄을 한 명씩 나눈다. 'JUSTHIS(저스디스), Kid Milli & NO:EL', 'IU X 윤현상', 제목의 '(Feat. G-DRAGON)'
+// 이름 안에 쉼표나 &가 든 가수는 나누지 않는다. '& the'로 이어지는 것도 한 이름이다 ('Echo & the Bunnymen')
+const WHOLE_NAMES = ['Tyler, The Creator', 'Earth, Wind & Fire', 'Crosby, Stills, Nash & Young', 'Simon & Garfunkel', 'Hall & Oates', 'Mumford & Sons', 'Years & Years', 'Iron & Wine', 'Above & Beyond', 'Chase & Status', 'Belle & Sebastian', 'Brooks & Dunn', 'Big & Rich']
+  .map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+const FEAT_IN = /[(\[（]\s*(?:feat(?:uring)?\.?|ft\.?|with)\s+([^)\]）]+)[)\]）]/gi, FEAT_AFTER = /\s(?:feat(?:uring)?|ft)\.?\s+/i;
+function splitNames(s) {
+  const keep = [], out = [];
+  let v = String(s ?? ''), cur = '', sep = '', depth = 0;
+  for (const re of WHOLE_NAMES) v = v.replace(re, x => `\u0001${keep.push(x) - 1}\u0001`);
+  const put = () => {
+    const x = cur.trim().replace(/\u0001(\d+)\u0001/g, (_, k) => keep[k]);
+    if (x && out.length && /&/.test(sep) && /^the\s/i.test(x)) out[out.length - 1] += sep + x;
+    else if (x) out.push(x);
+  };
+  for (let i = 0; i < v.length; i++) {
+    const c = v[i];
+    if ('([（【'.includes(c)) depth++;
+    else if (')]）】'.includes(c)) depth = Math.max(0, depth - 1);
+    // 괄호 밖의 쉼표, &, ×, 띄어 쓴 x. 'Lil Nas X & …'의 X는 이름이다
+    const m = !depth && /^(?:\s*[,，、&＆×]\s*|\s+[xX]\s+(?![,，、&＆]))/.exec(v.slice(i));
+    if (m) { put(); sep = m[0]; cur = ''; i += m[0].length - 1; }
+    else cur += c;
+  }
+  put();
+  return out;
+}
+const artistsCache = new WeakMap();
+// 곡의 가수들: 가수 줄의 가수가 먼저, 그다음 피처링(feat: true). 같은 가수는 한 번만
+function artistsOf(t) {
+  const m = meta(t);
+  if (artistsCache.has(m)) return artistsCache.get(m);
+  const out = [], feats = [];
+  const add = (s, feat) => { for (const name of splitNames(s)) if (!out.some(a => sameArtist(a.name, name))) out.push({ name, feat }); };
+  let a = m.artist.replace(FEAT_IN, (_, x) => (feats.push(x), ' ')).trim();
+  const f = FEAT_AFTER.exec(a);
+  if (f) { feats.push(a.slice(f.index + f[0].length)); a = a.slice(0, f.index); }
+  add(a, false);
+  const title = m.title.replace(FEAT_IN, (_, x) => (feats.push(x), ' ')), g = FEAT_AFTER.exec(title);
+  if (g) feats.push(title.slice(g.index + g[0].length));
+  for (const x of feats) add(x, true);
+  artistsCache.set(m, out);
+  return out;
+}
+// 'JUSTHIS(저스디스)'는 'JUSTHIS'로 보여 준다. 같은 가수인지는 괄호 안 이름까지 보고 판단한다
+const shortName = s => String(s ?? '').replace(/\s*[(（][^()（）]*[)）]$/, '').trim() || String(s ?? '');
+// 단체곡은 참여한 가수 모두의 곡이다. 예전에 묶인 이름 그대로 팔로우한 것도 맞는 것으로 친다
+const hasArtist = (t, name) => sameArtist(meta(t).artist, name) || artistsOf(t).some(a => sameArtist(a.name, name));
 
 // 라이브·방송·커버 영상은 연주가 음원과 달라서 길이가 같아도 가사 시간이 맞지 않는다.
 // 'Live Forever', '드라이브', 'Cover Me'처럼 곡 이름에 든 말은 잡지 않게 괄호 안이나 정해진 꼴만 본다
@@ -1747,12 +1805,13 @@ function topArtists(stats, n) {
   const by = new Map();
   for (const s of Object.values(stats)) {
     if (!(s.plays > 0)) continue;
-    const name = meta(s.t).artist;
-    if (!name) continue;
-    const k = artistKey(name), a = by.get(k) || { name, plays: 0, t: s.t, top: 0 };
-    a.plays += s.plays;
-    if (s.plays > a.top) { a.top = s.plays; a.t = s.t; }
-    by.set(k, a);
+    // 단체곡은 참여한 가수마다 센다. 'IU(아이유)'와 'IU'는 한 사람이다
+    for (const { name } of artistsOf(s.t)) {
+      let a = [...by.values()].find(x => sameArtist(x.name, name));
+      if (!a) by.set(artistKey(name), a = { name, plays: 0, t: s.t, top: 0 });
+      a.plays += s.plays;
+      if (s.plays > a.top) { a.top = s.plays; a.t = s.t; }
+    }
   }
   return [...by.values()].sort((a, b) => b.plays - a.plays).slice(0, n);
 }
@@ -1784,7 +1843,7 @@ const autoplayOn = () => store.settings.autoplay !== false;
 const useAuto = () => autoplayOn() && (Q.source === 'search' || store.repeat !== 'all');
 const smartOn = () => !!store.shuffle && !!store.smart;
 // '이 아티스트 재생 안 함': 자동 추천에서만 뺀다. 내가 직접 고른 곡과 재생목록은 그대로 재생한다
-const artistBlocked = t => store.noArtist.some(n => sameArtist(meta(t).artist, n));
+const artistBlocked = t => store.noArtist.some(n => hasArtist(t, n));
 // 자동 추천 켜기/끄기나 반복 모드가 바뀌면: 더는 안 쓸 추천은 버리고, 쓸 수 있게 되면 다시 채운다
 function autoSettingChanged() {
   if (useAuto()) refillAuto(); else { Q.auto = []; Q.autoEpoch++; }
@@ -2069,7 +2128,10 @@ const plById = id => store.playlists.find(p => p.id === id);
 const folderById = id => store.folders.find(f => f.id === id);
 const isCur = t => current()?.id === t.id;
 const myName = () => chatName() || '나';
-const artistLink = name => (name ? `<a data-act="artist" data-id="${esc(name)}">${esc(name)}</a>` : '');
+const artistLink = name => (name ? `<a data-act="artist" data-id="${esc(name)}">${esc(shortName(name))}</a>` : '');
+// 단체곡은 가수마다 따로 눌러서 그 가수 화면으로 간다
+const artistLinks = t => artistsOf(t).map(a => artistLink(a.name)).join(', ');
+const artistText = t => artistsOf(t).map(a => shortName(a.name)).join(', ');
 const GRAD = { liked: 'linear-gradient(135deg,#450af5,#c4efd9)', video: 'linear-gradient(135deg,#9c3a4a,#ffd39f)', radio: 'linear-gradient(135deg,#1e3264,#509bf5)' };
 const longTime = s => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? `약 ${h}시간 ${m}분` : `${m}분`; };
 function dateText(at) {
@@ -2133,8 +2195,8 @@ function trackRow(key, t, i, o) {
   const m = meta(t), k = esc(key), on = isLiked(t.id, listKind(key));
   return `<div class="trk${isCur(t) ? ' cur' : ''}" data-row data-id="${esc(t.id)}" data-list="${k}" data-i="${i}" draggable="true">
     <span class="n"><span class="num">${o.no ?? i + 1}</span><button class="rp" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>
-    <div class="tt">${o.pic === false ? '' : `<img src="${thumb(t.id)}" loading="lazy" alt="">`}<div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div>
-    ${store.settings.compact ? `<span class="c-art">${artistLink(m.artist)}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${albumCell(t)}</span>`}${o.date ? `<span class="c-date">${esc(dateText(t.at))}</span>` : ''}
+    <div class="tt">${o.pic === false ? '' : `<img src="${thumb(t.id)}" loading="lazy" alt="">`}<div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLinks(t)}</div></div></div>
+    ${store.settings.compact ? `<span class="c-art">${artistLinks(t)}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${albumCell(t)}</span>`}${o.date ? `<span class="c-date">${esc(dateText(t.at))}</span>` : ''}
     <div class="tail"><button class="like${on ? ' on' : ''}" data-act="like" data-list="${k}" data-i="${i}" title="${on ? '좋아요 취소' : '좋아요'}">${ic(on ? 'check-circle' : 'add-circle')}</button><span class="c-dur">${esc(t.duration || '')}</span><button class="more" data-act="more" data-list="${k}" data-i="${i}" title="더보기">${ic('more')}</button></div>
   </div>`;
 }
@@ -2166,9 +2228,9 @@ function actBar(key, o = {}) {
   </div>`;
 }
 // 카드
-const cardTrack = (key, t, i) => { const m = meta(t), k = esc(key); return `<div class="card" data-act="play" data-list="${k}" data-i="${i}" data-ctx="track"><div class="art"><img src="${thumb(t.id)}" alt="" loading="lazy"><button class="cplay" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button></div><div class="t1">${esc(m.title)}</div><div class="t2">${esc(m.artist)}</div></div>`; };
+const cardTrack = (key, t, i) => { const m = meta(t), k = esc(key); return `<div class="card" data-act="play" data-list="${k}" data-i="${i}" data-ctx="track"><div class="art"><img src="${thumb(t.id)}" alt="" loading="lazy"><button class="cplay" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button></div><div class="t1">${esc(m.title)}</div><div class="t2">${esc(artistText(t))}</div></div>`; };
 const cardPlaylist = p => `<div class="card" data-act="go" data-route="playlist" data-id="${p.id}" data-ctx="pl:${p.id}"><div class="art">${plArt(p)}${p.tracks.length ? `<button class="cplay" data-act="playpl" data-id="${p.id}" title="재생">${ic('play')}</button>` : ''}</div><div class="t1">${esc(p.name)}</div><div class="t2">${esc(p.desc || `${myName()} · ${p.tracks.length}곡`)}</div></div>`;
-const cardArtist = a => `<div class="card round" data-act="artist" data-id="${esc(a.name)}" data-ctx="ar:${esc(a.name)}"><div class="art">${a.t ? `<img src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`}<button class="cplay" data-act="playartist" data-id="${esc(a.name)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(a.name)}</div><div class="t2">아티스트</div></div>`;
+const cardArtist = a => `<div class="card round" data-act="artist" data-id="${esc(a.name)}" data-ctx="ar:${esc(a.name)}"><div class="art">${a.t ? `<img src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`}<button class="cplay" data-act="playartist" data-id="${esc(a.name)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(shortName(a.name))}</div><div class="t2">아티스트</div></div>`;
 const cardAlbum = a => `<div class="card" data-act="go" data-route="album" data-id="${esc(a.id)}" data-ctx="al:${esc(a.id)}"><div class="art">${a.c ? `<img src="${esc(a.c)}" alt="" loading="lazy">` : `<span class="pic">${ic('note')}</span>`}<button class="cplay" data-act="playalbum" data-id="${esc(a.id)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(albumTitle(a.n))}</div><div class="t2">${esc([a.y, albumKind(a.n)].filter(Boolean).join(' · '))}</div></div>`;
 const cardMix = x => `<div class="card" data-act="radio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" data-sub="${esc(x.sub)}"><div class="art"><img src="${thumb(x.seed.id)}" alt="" loading="lazy"><button class="cplay" data-act="playradio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(x.label)}</div><div class="t2">${esc(x.sub)}</div></div>`;
 const shelf = (title, inner, more) => `<section class="shelf"><div class="shelf-h"><h2>${more ? `<a data-act="go" data-route="shelf" data-id="${more}">${esc(title)}</a>` : esc(title)}</h2>${more ? `<a class="more" data-act="go" data-route="shelf" data-id="${more}">모두 표시</a>` : ''}</div><div class="row1">${inner}</div></section>`;
@@ -2268,7 +2330,7 @@ function renderSearch(el) {
   }
   const res = s.results;
   const artists = [];
-  for (const t of res) { const name = meta(t).artist; if (name && !artists.some(a => sameArtist(a.name, name))) artists.push({ name, t }); }
+  for (const t of res) for (const { name } of artistsOf(t)) if (!artists.some(a => sameArtist(a.name, name))) artists.push({ name, t });
   const chips = `<div class="chips search-chips">${[['all', '모두'], ['songs', '곡'], ['artists', '아티스트'], ['albums', '앨범']].map(([k, l]) => `<button class="chip${searchTab === k ? ' on' : ''}" data-act="searchchip" data-id="${k}">${l}</button>`).join('')}</div>`;
   if (!res.length) { lists.search = []; el.innerHTML = `<div class="pad s-empty"><h2>'${esc(s.q)}'에 대한 검색 결과가 없습니다</h2><p class="m-hint">철자를 확인하거나 다른 검색어를 사용해 보세요.</p></div>`; return; }
   let body;
@@ -2283,11 +2345,10 @@ function renderSearch(el) {
     // 맨 위 띠: 검색어가 가수 이름이면 가수, 아니면 첫 곡. 그 아래는 곡과 가수가 섞인 한 줄 목록
     lists.search = res;
     const hit = artists.find(a => sameArtist(a.name, s.q)), t = res[0], m = meta(t);
-    const followBtn = name => `<button class="pill" data-act="follow" data-id="${esc(name)}">${isFollowing(name) ? '팔로잉' : '팔로우하기'}</button>`;
     const band = hit
-      ? `<div class="top ar" data-act="go" data-route="artist" data-id="${esc(hit.name)}"><img src="${thumb(hit.t.id)}" alt=""><div class="tx"><div class="t1">${esc(hit.name)}</div><div class="t2">아티스트</div></div>${followBtn(hit.name)}<button class="cplay" data-act="playartist" data-id="${esc(hit.name)}" title="재생">${ic('play')}</button></div>`
-      : `<div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(m.artist)}` : ''}</div></div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div>`;
-    const mixArtist = a => `<div class="mix-art" data-act="go" data-route="artist" data-id="${esc(a.name)}"><div class="tt"><img src="${thumb(a.t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(a.name)}</div><div class="t2">아티스트</div></div></div>${followBtn(a.name)}</div>`;
+      ? `<div class="top ar" data-act="go" data-route="artist" data-id="${esc(hit.name)}"><img src="${thumb(hit.t.id)}" alt=""><div class="tx"><div class="t1">${esc(shortName(hit.name))}</div><div class="t2">아티스트</div></div>${followBtn(hit.name)}<button class="cplay" data-act="playartist" data-id="${esc(hit.name)}" title="재생">${ic('play')}</button></div>`
+      : `<div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(artistText(t))}` : ''}</div></div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div>`;
+    const mixArtist = a => `<div class="mix-art" data-act="go" data-route="artist" data-id="${esc(a.name)}"><div class="tt"><img src="${thumb(a.t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(shortName(a.name))}</div><div class="t2">아티스트</div></div></div>${followBtn(a.name)}</div>`;
     const others = artists.filter(a => a !== hit).slice(0, 6), mixed = [];
     res.forEach((x, i) => {
       if (!hit && !i) return;
@@ -2313,7 +2374,7 @@ const finders = {}, plRecs = {}, finderOpen = new Set();
 const finderOf = id => finders[id] || (finders[id] = { q: '', results: [], loading: false, error: '' });
 function offerRows(key, arr, id) {
   lists[key] = arr;
-  return arr.map((t, i) => { const m = meta(t); return `<div class="offer"><div class="trk" style="min-width:0"><div class="tt"><img src="${thumb(t.id)}" loading="lazy" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div></div></div><span class="c-alb">${esc(albumName(t))}</span><button class="pill" data-act="ploffer" data-list="${esc(key)}" data-i="${i}" data-id="${id}">추가하기</button></div>`; }).join('');
+  return arr.map((t, i) => { const m = meta(t); return `<div class="offer"><div class="trk" style="min-width:0"><div class="tt"><img src="${thumb(t.id)}" loading="lazy" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLinks(t)}</div></div></div></div><span class="c-alb">${esc(albumName(t))}</span><button class="pill" data-act="ploffer" data-list="${esc(key)}" data-i="${i}" data-id="${id}">추가하기</button></div>`; }).join('');
 }
 function loadRecs(p) {
   const seed = p.tracks[Math.floor(Math.random() * p.tracks.length)];
@@ -2615,7 +2676,7 @@ function discoSection(albums) {
 function loadArtist(name) {
   if (artistData.has(name)) return artistData.get(name);
   const p = search(name, { backup: false, link: false }).then(r => {
-    const mine = r.filter(t => sameArtist(meta(t).artist, name));
+    const mine = r.filter(t => hasArtist(t, name));
     return { top: (mine.length >= 3 ? mine : r).slice(0, 20) };
   }).catch(() => { artistData.delete(name); return { top: [] }; });
   artistData.set(name, p);
@@ -2623,22 +2684,23 @@ function loadArtist(name) {
 }
 const artistShown = new Map(), artistMore = new Set();
 const isFollowing = name => store.following.some(a => sameArtist(a.name, name));
+const followBtn = name => `<button class="pill" data-act="follow" data-id="${esc(name)}">${isFollowing(name) ? '팔로잉' : '팔로우하기'}</button>`;
 function myTracksOf(name) {
   const seen = new Map();
-  for (const t of store.liked) if (sameArtist(meta(t).artist, name)) seen.set(t.id, t);
-  for (const s of Object.values(store.stats)) if (s.plays > 0 && sameArtist(meta(s.t).artist, name)) seen.set(s.t.id, s.t);
+  for (const t of store.liked) if (hasArtist(t, name)) seen.set(t.id, t);
+  for (const s of Object.values(store.stats)) if (s.plays > 0 && hasArtist(s.t, name)) seen.set(s.t.id, s.t);
   return [...seen.values()];
 }
 function similarArtists(name, top) {
   const out = [];
-  for (const t of top) { const a = meta(t).artist; if (a && !sameArtist(a, name) && !out.some(x => sameArtist(x.name, a))) out.push({ name: a, t }); }
+  for (const t of top) for (const { name: a } of artistsOf(t)) if (!sameArtist(a, name) && !out.some(x => sameArtist(x.name, a))) out.push({ name: a, t });
   return out;
 }
 const bioCard = d => `<div class="bio-card">${d.photo ? `<img src="${esc(d.photo)}" data-alt="${esc(d.small)}" alt="" loading="lazy">` : ''}<p>${esc(d.bio)}</p></div>`;
 function renderArtist(el, r) {
   const name = r.id, key = 'ar:' + name, d = artistShown.get(name), mine = myTracksOf(name);
   if (!d) loadArtist(name).then(v => { artistShown.set(name, v); if (route.name === 'artist' && route.id === name) renderMain(); });
-  const top = d && d.top.length ? d.top : mine, plays = Object.values(store.stats).filter(s => sameArtist(meta(s.t).artist, name)).reduce((a, s) => a + s.plays, 0);
+  const top = d && d.top.length ? d.top : mine, plays = Object.values(store.stats).filter(s => hasArtist(s.t, name)).reduce((a, s) => a + s.plays, 0);
   const seed = top[0], more = artistMore.has(name), following = isFollowing(name), mix = seed && mixSeen.get(seed.id);
   if (seed && !mix) fetchMix(seed.id).then(m => { if (m.length) { mixSeen.set(seed.id, m); if (route.name === 'artist' && route.id === name) renderMain(); } });
   const like = similarArtists(name, mix || []);
@@ -2646,7 +2708,7 @@ function renderArtist(el, r) {
   // 가로로 넓은 사진만 머리에 깐다. 세로 사진은 둥글게 이름 옆에 둔다 (머리 사진이 없는 가수의 모양)
   const disco = discoOf(name, mine.map(t => store.albums[t.id]?.aid).find(Boolean)), round = disco?.small && !disco.wide ? disco.small : '', photo = disco?.wide ? disco.photo : !round && seed ? thumbBig(seed.id) : '';
   el.innerHTML = stickBar(name, key) + `
-    <div class="hero${round ? '' : ' artist'}" ${photo ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${esc(cssUrl(photo))})"` : ''}>${round ? `<img class="art round" src="${esc(round)}" alt="">` : ''}<div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(name)}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
+    <div class="hero${round ? '' : ' artist'}" ${photo ? `style="background-image:linear-gradient(transparent 25%,rgba(0,0,0,.7)),url(${esc(cssUrl(photo))})"` : ''}>${round ? `<img class="art round" src="${esc(round)}" alt="">` : ''}<div class="hero-t"><div class="hero-type">아티스트</div><h1>${esc(shortName(name))}</h1><div class="hero-sub">${plays ? `내가 들은 횟수 ${plays}번` : '아직 들은 적 없음'}</div></div></div>
     <div class="below">${actBar(key, { more: 'armore', id: name, find: false, extra: `<button class="pill" data-act="follow" data-id="${esc(name)}">${following ? '팔로잉' : '팔로우하기'}</button>` })}
     <div class="sec"><h2>인기</h2>${d ? trackTable(key, top, { head: false, album: false, limit: more ? 20 : 5, empty: '이 아티스트의 곡을 찾지 못했어요' }) : '<p class="m-hint">불러오는 중…</p>'}${d && top.length > 5 ? `<button class="showmore" data-act="armoretoggle" data-id="${esc(name)}">${more ? '간단히 보기' : '자세히 보기'}</button>` : ''}</div>
     ${mine.length ? `<div class="sec"><h2>내가 들은 곡</h2>${trackTable('mine:' + name, mine, { head: false, album: false, limit: 5 })}</div>` : ''}
@@ -2754,7 +2816,7 @@ function videoNext() {
 function renderVideo(el) {
   const t = current(), m = t && meta(t);
   el.innerHTML = `<div class="pad vid-page"><div><div id="video-slot">${t ? '' : '재생 중인 곡이 없어요'}</div>
-    ${t ? `<div class="vid-t">${esc(m.title)}</div><p class="m-hint vid-s">${esc(m.artist)} · V 또는 영상 버튼으로 닫기</p>` : ''}</div><aside id="vid-next">${videoNext()}</aside></div>`;
+    ${t ? `<div class="vid-t">${esc(m.title)}</div><p class="m-hint vid-s">${esc(artistText(t))} · V 또는 영상 버튼으로 닫기</p>` : ''}</div><aside id="vid-next">${videoNext()}</aside></div>`;
 }
 // 영상 검색: 음악 검색과 결과, 기록을 따로 둔다
 const vsearches = () => store.video.searches || (store.video.searches = []); // 옛 저장 데이터에는 이 칸이 없다
@@ -2811,7 +2873,7 @@ function libEntries() {
     out.push({ key: 'pl:' + p.id, type: 'pl', name: p.name, sub: `플레이리스트 · ${myName()}`, attrs: `data-route="playlist" data-id="${p.id}"`, pic: plArt(p), on: route.name === 'playlist' && route.id === p.id, at: p.at || 0 });
   }
   for (const f of store.folders) out.push({ key: 'fo:' + f.id, type: 'folder', name: f.name, sub: `플레이리스트 ${store.playlists.filter(p => p.folder === f.id).length}개`, attrs: `data-route="folder" data-id="${f.id}"`, pic: `<span class="pic">${ic('folder')}</span>`, on: route.name === 'folder' && route.id === f.id, at: f.at || 0 });
-  for (const a of store.following) out.push({ key: 'ar:' + a.name, type: 'artist', round: true, name: a.name, sub: '아티스트', attrs: `data-route="artist" data-id="${esc(a.name)}"`, pic: a.t ? `<img class="pic" src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`, on: route.name === 'artist' && route.id === a.name, at: a.at || 0 });
+  for (const a of store.following) out.push({ key: 'ar:' + a.name, type: 'artist', round: true, name: shortName(a.name), sub: '아티스트', attrs: `data-route="artist" data-id="${esc(a.name)}"`, pic: a.t ? `<img class="pic" src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`, on: route.name === 'artist' && route.id === a.name, at: a.at || 0 });
   for (const a of store.savedAlbums) out.push({ key: 'al:' + a.id, type: 'album', name: a.n, sub: `앨범 · ${a.a}`, attrs: `data-route="album" data-id="${esc(a.id)}"`, pic: a.c ? `<img class="pic" src="${esc(a.c)}" alt="" loading="lazy">` : `<span class="pic">${ic('note')}</span>`, on: route.name === 'album' && String(route.id) === String(a.id), at: a.at });
   return out;
 }
@@ -2896,8 +2958,8 @@ function renderNowView() {
   const el = $('#nowview'), t = current();
   if (store.panel !== 'now') return;
   if (!t) { el.dataset.sig = ''; el.innerHTML = `<div class="rp-head"><b>지금 재생 중</b>${closeBtn}</div><div class="rp-body"><p class="m-hint">재생 중인 곡이 없어요</p></div>`; npl.lines = null; placePlayer(); return; }
-  const m = meta(t), n = nextUp(), liked = isLiked(t.id), s = bucket().stats[t.id], ctx = Q.ctx;
-  const key = lyricKey(t), sig = [t.id, t.title, liked, s?.plays, n?.id, ctx?.name, isFollowing(m.artist), key].join('|');
+  const m = meta(t), arts = artistsOf(t), a0 = arts[0]?.name, n = nextUp(), liked = isLiked(t.id), s = bucket().stats[t.id], ctx = Q.ctx;
+  const key = lyricKey(t), sig = [t.id, t.title, liked, s?.plays, n?.id, ctx?.name, arts.map(a => +isFollowing(a.name)).join(''), key].join('|');
   if (el.dataset.sig === sig) return;
   // 같은 곡을 다시 그릴 때(재생 횟수가 오를 때 등)는 보던 자리를 지킨다
   const keep = npl.id === t.id ? $('#nowview .rp-body')?.scrollTop || 0 : 0;
@@ -2905,11 +2967,12 @@ function renderNowView() {
   el.innerHTML = `<div class="rp-head"><b>${ctx?.route ? `<a data-act="goctx">${esc(ctx.name)}</a>` : esc(ctx?.name || '지금 재생 중')}</b><span style="display:flex;gap:4px"><button data-act="nowmore" title="더보기">${ic('more')}</button>${closeBtn}</span></div>
     <div class="rp-body">
       <div class="np-vid" id="np-video" data-act="video" title="영상 크게 보기"><img class="np-art" src="${thumbBig(t.id)}" data-big="${esc(t.id)}" alt=""></div>
-      <div class="np-row"><div class="np-tx"><div class="np-t">${esc(m.title)}</div><div class="np-a">${artistLink(m.artist)}</div></div><button class="${liked ? 'on' : ''}" data-act="likecur" title="${liked ? '좋아요 취소' : '좋아요'}">${ic(liked ? 'check-circle' : 'add-circle')}</button></div>
+      <div class="np-row"><div class="np-tx"><div class="np-t">${esc(m.title)}</div><div class="np-a">${artistLinks(t)}</div></div><button class="${liked ? 'on' : ''}" data-act="likecur" title="${liked ? '좋아요 취소' : '좋아요'}">${ic(liked ? 'check-circle' : 'add-circle')}</button></div>
       <div class="np-card np-lyr" id="np-lyr" style="--lc:${seedColor(t.title)}" hidden><h4><span class="np-lt"></span><span class="np-lb"><button data-act="lyrfull" title="전체 화면으로 전환"><svg class="mi" aria-hidden="true"><use href="#m-fullscreen"/></svg></button><button data-act="lyrics" title="큰 화면으로 열기"><svg class="mi" aria-hidden="true"><use href="#m-expand"/></svg></button></span></h4><div class="np-lines"></div><button class="np-lmore" data-act="nplyr"></button></div>
-      ${m.artist ? `<div class="np-card"><h4>아티스트 정보</h4><div class="np-artist"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1"><a data-act="artist" data-id="${esc(m.artist)}">${esc(m.artist)}</a></div><div class="t2">아티스트</div></div><button class="pill" data-act="follow" data-id="${esc(m.artist)}">${isFollowing(m.artist) ? '팔로잉' : '팔로우하기'}</button></div></div>` : ''}
+      ${a0 ? `<div class="np-card"><h4>아티스트 정보</h4><div class="np-artist"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1">${artistLink(a0)}</div><div class="t2">아티스트</div></div>${followBtn(a0)}</div></div>` : ''}
+      ${arts.length > 1 ? `<div class="np-card"><h4>참여한 가수</h4>${arts.map(a => `<div class="np-credit"><div class="tx"><div class="t1">${artistLink(a.name)}</div><div class="t2">${a.feat ? '피처링' : '가수'}</div></div>${followBtn(a.name)}</div>`).join('')}</div>` : ''}
       <div class="np-card"><h4>곡 정보</h4><div class="np-kv"><span>채널</span><b>${esc(t.channel || '-')}</b></div><div class="np-kv"><span>길이</span><b>${esc(t.duration || fmt(t.seconds))}</b></div><div class="np-kv"><span>내가 들은 횟수</span><b>${s ? s.plays : 0}번</b></div></div>
-      <div class="np-card"><h4>다음 재생 항목<a data-act="panel" data-panel="queue">재생목록 열기</a></h4>${n ? `<div class="np-artist" style="cursor:pointer" data-act="next"><img src="${thumb(n.id)}" alt="" style="border-radius:4px;width:48px;height:48px"><div class="tx"><div class="t1" style="font-weight:400">${esc(meta(n).title)}</div><div class="t2">${esc(meta(n).artist)}</div></div></div>` : '<p class="m-hint" style="margin:0">다음 곡이 없어요</p>'}</div>
+      <div class="np-card"><h4>다음 재생 항목<a data-act="panel" data-panel="queue">재생목록 열기</a></h4>${n ? `<div class="np-artist" style="cursor:pointer" data-act="next"><img src="${thumb(n.id)}" alt="" style="border-radius:4px;width:48px;height:48px"><div class="tx"><div class="t1" style="font-weight:400">${esc(meta(n).title)}</div><div class="t2">${esc(artistText(n))}</div></div></div>` : '<p class="m-hint" style="margin:0">다음 곡이 없어요</p>'}</div>
     </div>`;
   paintNpCard();
   const body = el.querySelector('.rp-body');
@@ -2930,7 +2993,7 @@ function renderNowView() {
 }
 function queueRow(t, k, act, x) {
   const m = meta(t);
-  return `<div class="trk" data-act="${act}" data-i="${k}" ${x || ''}><img src="${thumb(t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${esc(m.artist)}</div></div>`;
+  return `<div class="trk" data-act="${act}" data-i="${k}" ${x || ''}><img src="${thumb(t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${esc(artistText(t))}</div></div>`;
 }
 function renderQueue() {
   if (mode !== 'music') return;
@@ -2941,7 +3004,7 @@ function renderQueue() {
   const row = ({ t, k }) => `${queueRow(t, k, 'jump', `draggable="true" data-qrow="${k}"`)}<button data-act="unqueue" data-i="${k}" title="빼기">${ic('close')}</button></div>`;
   $('#queue').innerHTML = head + `<div class="rp-body">
     <div class="q-sec"><h4>지금 재생 중</h4></div>
-    ${cur ? `<div class="trk cur"><img src="${thumb(cur.id)}" alt=""><div class="tx"><div class="t1">${esc(meta(cur).title)}</div><div class="t2">${esc(meta(cur).artist)}</div></div><span></span></div>` : '<p class="m-hint">없음</p>'}
+    ${cur ? `<div class="trk cur"><img src="${thumb(cur.id)}" alt=""><div class="tx"><div class="t1">${esc(meta(cur).title)}</div><div class="t2">${esc(artistText(cur))}</div></div><span></span></div>` : '<p class="m-hint">없음</p>'}
     ${mine.length ? `<div class="q-sec"><h4>다음 재생 항목</h4><button data-act="clearqueue">재생목록 지우기</button></div>${mine.map(row).join('')}` : ''}
     ${rest.length || !mine.length ? `<div class="q-sec"><h4>${Q.ctx?.name ? `다음 재생 ${esc(Q.ctx.name)}` : '다음 재생'}</h4></div>` : ''}
     ${rest.length ? rest.map(row).join('')
@@ -2960,7 +3023,7 @@ function renderNow() {
   const sig = t ? [t.id, t.title, liked, isDisliked(t.id)].join('|') : '';
   if (nowEl.dataset.sig !== sig || !t) nowEl.innerHTML = t ? `
     <img src="${thumb(t.id)}" alt="" data-act="panel" data-panel="now">
-    <div class="tx"><div class="t1" data-act="nowtitle">${esc(m.title)}</div><div class="t2">${artistLink(m.artist)}</div></div>
+    <div class="tx"><div class="t1" data-act="nowtitle">${esc(m.title)}</div><div class="t2">${artistLinks(t)}</div></div>
     <button data-act="likecur" class="${liked ? 'liked-on' : ''}" title="${liked ? '좋아요 취소' : '좋아요'}">${ic(liked ? 'check-circle' : 'add-circle')}</button>
     <button data-act="dislikecur" class="${isDisliked(t.id) ? 'liked-on' : ''}" title="싫어요">${ic(isDisliked(t.id) ? 'thumb-down' : 'thumb-down-o')}</button>
     <button data-act="dlcur" title="MP3/MP4로 받기">${ic('download')}</button>` : '';
@@ -3053,7 +3116,7 @@ function showMenu(anchor, key, i) {
     ${mi('m-queue', 'queue', '재생목록에 추가하기')}
     ${mi('m-next', 'next', '다음에 재생')}
     ${mi('m-dislike', 'thumb-down-o', isDisliked(menuTrack.id, menuKind) ? '싫어요 취소' : '싫어요')}
-    ${many ? '' : `<hr>${mi('m-radio', 'radio', '음악 라디오 보러가기')}${m.artist ? mi('m-artist', 'person', '아티스트로 이동하기') : ''}${store.albums[menuTrack.id]?.id ? mi('m-album', 'note', '앨범으로 이동하기') : ''}${mi('m-share', 'link', '곡 링크 복사')}`}
+    ${many ? '' : `<hr>${mi('m-radio', 'radio', '음악 라디오 보러가기')}${artistsOf(menuTrack).length > 1 ? `<button data-act="m-artist" data-sub="1">${ic('person')}<span>아티스트로 이동하기</span>${ic('chev-r')}</button>` : artistsOf(menuTrack).length ? mi('m-artist', 'person', '아티스트로 이동하기') : ''}${store.albums[menuTrack.id]?.id ? mi('m-album', 'note', '앨범으로 이동하기') : ''}${mi('m-share', 'link', '곡 링크 복사')}`}
     <hr>${DL_ITEMS}${key === 'now' ? `<hr>${mi('sleepmenu', 'moon', '수면 타이머')}${mi('speedmenu', 'speed', '재생 속도')}` : ''}`;
   placeMenu(anchor);
 }
@@ -3097,8 +3160,13 @@ function showArtistMenu(anchor, name) {
   placeMenu(anchor);
 }
 function showAddTo(btn) {
+  showSub(btn, `${mi('m-newpl', 'add', '새 플레이리스트')}<hr>${store.playlists.map(p => mi('m-addpl', 'note', p.name, `data-id="${p.id}"`)).join('') || '<p class="m-hint" style="padding:8px 12px;margin:0">아직 없어요</p>'}`);
+}
+// 단체곡의 '아티스트로 이동하기': 참여한 가수 중에서 고른다
+const showArtistsSub = btn => showSub(btn, artistsOf(menuTrack).map(a => mi('m-artistgo', 'person', shortName(a.name), `data-id="${esc(a.name)}"`)).join(''));
+function showSub(btn, html) {
   const m2 = $('#menu2');
-  m2.innerHTML = `${mi('m-newpl', 'add', '새 플레이리스트')}<hr>${store.playlists.map(p => mi('m-addpl', 'note', p.name, `data-id="${p.id}"`)).join('') || '<p class="m-hint" style="padding:8px 12px;margin:0">아직 없어요</p>'}`;
+  m2.innerHTML = html;
   m2.hidden = false;
   const r = btn.getBoundingClientRect(), w = m2.offsetWidth, h = m2.offsetHeight;
   m2.style.left = (r.right + w + 8 > innerWidth ? Math.max(8, r.left - w - 4) : r.right + 4) + 'px';
@@ -3122,7 +3190,7 @@ function hideMenu() { $('#menu').hidden = true; $('#menu2').hidden = true; }
 document.addEventListener('mouseover', e => {
   const b = e.target.closest?.('#menu button');
   if (!b) return;
-  if (b.dataset.act === 'm-addto') showAddTo(b); else $('#menu2').hidden = true;
+  if (b.dataset.act === 'm-addto') showAddTo(b); else if (b.dataset.act === 'm-artist' && b.dataset.sub) showArtistsSub(b); else $('#menu2').hidden = true;
 });
 
 // 창
@@ -3430,7 +3498,7 @@ function setPin(key) {
 function toggleFollow(name) {
   if (isFollowing(name)) store.following = store.following.filter(a => !sameArtist(a.name, name));
   else {
-    const t = artistShown.get(name)?.top[0] || myTracksOf(name)[0] || (current() && sameArtist(meta(current()).artist, name) ? current() : null);
+    const t = artistShown.get(name)?.top[0] || myTracksOf(name)[0] || (current() && hasArtist(current(), name) ? current() : null);
     store.following.unshift({ name, t: t ? slim(t) : null, at: Date.now() });
   }
   save(); renderAll();
@@ -3514,7 +3582,8 @@ document.addEventListener('click', e => {
     case 'm-dislike': menuTracks.forEach(t => toggleDislike(t, menuKind)); hideMenu(); break;
     case 'm-dl': menuTracks.forEach(t => downloadTrack(t, el.dataset.fmt)); hideMenu(); break;
     case 'm-radio': goRadio(menuTrack); hideMenu(); break;
-    case 'm-artist': go({ name: 'artist', id: meta(menuTrack).artist }); hideMenu(); break;
+    case 'm-artist': if (el.dataset.sub) showArtistsSub(el); else { go({ name: 'artist', id: artistsOf(menuTrack)[0]?.name || meta(menuTrack).artist }); hideMenu(); } break;
+    case 'm-artistgo': go({ name: 'artist', id: el.dataset.id }); hideMenu(); break;
     case 'm-album': go({ name: 'album', id: String(store.albums[menuTrack.id].id) }); hideMenu(); break;
     case 'albmore': showAlbumMenu(el, id); break;
     case 'albsave': toggleAlbumSave(id); hideMenu(); break;
@@ -4355,7 +4424,7 @@ function renderMini() {
   const svg = n => `<svg viewBox="0 0 24 24">${path(n)}</svg>`;
   d.querySelector('#a').src = t ? thumb(t.id) : '';
   d.querySelector('#t').textContent = t ? meta(t).title : '';
-  d.querySelector('#s').textContent = t ? meta(t).artist : '';
+  d.querySelector('#s').textContent = t ? artistText(t) : '';
   d.querySelector('[data-m="prev"]').innerHTML = svg('prev');
   d.querySelector('[data-m="next"]').innerHTML = svg('next');
   d.querySelector('#p').innerHTML = svg(playing ? 'pause' : 'play');
