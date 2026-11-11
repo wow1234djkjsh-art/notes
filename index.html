@@ -964,6 +964,8 @@ const CONFIG = {
   dlUrl: 'http://localhost:8790',
   // 친구 채팅: 러버블 서버가 비밀번호를 확인하고 채팅 서버로 중계 (lovable/src/lib/chat-proxy.ts)
   chatUrl: '/api/chat',
+  // 기기 승인: 이 브라우저가 아직 승인돼 있나 (lovable/src/lib/device-gate.ts)
+  meUrl: '/api/me',
   panicUrl: 'https://docs.google.com/document/u/0/',
 };
 
@@ -1242,6 +1244,9 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 11일', [
+    '처음 쓰는 기기는 이름을 적고 승인을 받아야 들어올 수 있음',
+  ]],
   ['11월 9일', [
     '여러 가수가 함께 부른 곡은 가수 이름이 한 명씩 나뉘어 나오고, 이름마다 눌러서 그 가수 화면으로 갈 수 있음',
     '지금 재생 중에 참여한 가수 목록이 나오고, 한 명씩 팔로우할 수 있음. 피처링한 가수도 함께 나옴',
@@ -1859,6 +1864,7 @@ function takeAuto() {
 // 검색 서버 부르기 (러버블 /api/search): {action: 'search', q} | {action: 'mix', id} → {results} | {error}
 async function searchApi(body) {
   const r = await fetch(CONFIG.searchUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  if (r.status === 401) kicked();
   const j = await r.json().catch(() => ({}));
   if (!r.ok && !j.error) j.error = 'HTTP ' + r.status;
   return j;
@@ -2434,6 +2440,7 @@ const artistData = new Map();
 // 앨범 자료. YouTube에는 앨범이 없어서 러버블을 거쳐 애플 음악 자료에서 찾는다
 async function albumApi(body) {
   const r = await fetch(CONFIG.albumUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  if (r.status === 401) kicked();
   if (!r.ok) throw new Error('album ' + r.status);
   return r.json();
 }
@@ -4219,7 +4226,7 @@ function setSleep(v) {
 // ---------- 가사 (러버블 /api/lyrics가 LRCLIB에서 찾아 준다) ----------
 const lyricsCache = new Map();
 const lyricsPost = body => fetch(CONFIG.lyricsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
-  .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))));
+  .then(r => { if (r.status === 401) kicked(); return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); });
 // 직접 고른 가사가 있으면 그 기록을, 없으면 자동으로 찾은 기록을 쓴다. 고르면 키가 바뀌어서 화면이 새로 불러온다
 const lyricKey = t => t.id + '\n' + t.title + '\n' + (store.lyricPick[t.id]?.id || '');
 function fetchLyrics(t) {
@@ -4569,6 +4576,7 @@ function syncAlong() {
 const setChatNote = t => { $('#d-chat .dc-note').textContent = t; };
 async function chatRequest(body) {
   const r = await fetch(setting('chatUrl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ name: chatName(), since: chat.since, np: nowInfo(), ...body }) });
+  if (r.status === 401) kicked();
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) throw new Error(j.error || r.status);
   return j;
@@ -4647,6 +4655,31 @@ $('#d-chat textarea').addEventListener('keydown', e => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) chatPoll(); });
 chatPoll();
+
+// ---------- 기기 승인 (러버블 /api/me) ----------
+// 1분마다 이 브라우저가 아직 승인돼 있나 본다. 탭이 안 보여도 본다: 내보낸 기기가 1분 안에 나가게.
+// 401(내보냄·승인 취소·로그인 끝남)이면 재생을 멈추고 새로 연다 → 러버블이 대기 화면이나 로그인 화면을 보여 준다.
+// 다른 탭이 이어받아 멈춘 탭은 묻지 않는다 (같은 브라우저라 이어받은 탭이 본다)
+let kickedOnce = false;
+function kicked() {
+  if (kickedOnce) return;
+  kickedOnce = true;
+  pause();
+  location.reload();
+}
+async function checkMe() {
+  if (!tabActive || kickedOnce) return;
+  try {
+    const r = await fetch(CONFIG.meUrl, { credentials: 'same-origin', cache: 'no-store' });
+    if (r.status === 401) return kicked();
+    if (r.status !== 200) return; // 204 = 검색 서버가 안 됨, 그 밖 = 기능이 없음 → 그대로 둔다
+    const name = String((await r.json()).name || '').trim().slice(0, 20);
+    // 채팅 이름이 비어 있으면 승인할 때 적은 이름을 넣는다 (설정에서 바꿀 수 있다)
+    if (name && !chatName()) { store.settings.chatName = name; save(); renderFriends(); renderLib(); chatPoll(); }
+  } catch (e) {}
+}
+checkMe();
+setInterval(checkMe, 60000);
 
 // 처음 온 사람에게만: 단축키 → 업데이트 내역. 띄우는 순간 봤음으로 저장해서 다시는 안 뜬다
 if (FIRST_VISIT && !store.settings.introSeen) { store.settings.introSeen = true; save(); showKeys(true); }
