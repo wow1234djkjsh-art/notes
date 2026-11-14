@@ -1676,9 +1676,11 @@ function pickNext(pools, weights, exclude, rng) {
   let r = rng() * total, from;
   for (from in avail) { r -= pw[from]; if (r < 0) break; }
   const items = avail[from];
+  // p: 이 묶음이 뽑힐 실제 확률 (자동 곡 기록에 남긴다)
+  const p = pw[from] / total;
   let w = rng() * items.reduce((s, x) => s + x.w, 0);
-  for (const x of items) { w -= x.w; if (w < 0) return { t: x.t, from }; }
-  return { t: items[items.length - 1].t, from };
+  for (const x of items) { w -= x.w; if (w < 0) return { t: x.t, from, p }; }
+  return { t: items[items.length - 1].t, from, p };
 }
 // @@autoplay-pure-end
 
@@ -1853,6 +1855,23 @@ function moveItem(list, from, to) {
   return out;
 }
 // @@music-pure-end
+
+// ---------- 추천 개편 순수 함수 (test/recs.test.js) ----------
+// @@recs-pure-start
+// 추천 규칙 판 번호: 기록 줄마다 남긴다 (나중에 예전 판과 비교할 때 필요)
+const RECS_V = 1;
+// 넘긴 때: a 10초 안, b 30초 안, c 절반 전(길이를 모르면 30초 넘으면 c), e 절반 뒤
+function skipBucket(sec, dur) {
+  if (sec < 10) return 'a';
+  if (sec < 30) return 'b';
+  return !dur || sec < dur / 2 ? 'c' : 'e';
+}
+// 이 컴퓨터 시각 기준 날짜 'YYYY-MM-DD'
+function dayKey(ms) {
+  const d = new Date(ms), z = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+}
+// @@recs-pure-end
 
 // ---------- 자동 추천 (대기열 연결) ----------
 const autoplayOn = () => store.settings.autoplay !== false;
