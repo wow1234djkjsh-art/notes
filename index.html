@@ -1475,7 +1475,9 @@ const durTime = () => (playerReady && player.getDuration ? player.getDuration() 
 // user: 지금 곡 바로 뒤의 몇 곡이 내가 넣은 곡인지 (다음 대기열). 새 목록을 틀어도 이 곡들은 남는다. ctx: 어디서 틀었는지 {key, name, route}
 const Q = { list: [], i: -1, base: null, source: 'list', auto: [], removed: new Set(), gen: 0, autoEpoch: 0, waiting: false, autoEmpty: false, user: 0, ctx: null, smartN: 0,
   // 자동 후보가 뽑힐 때의 정보(경로·확률·기준·쪽)와, 자동 곡이 대기열로 들어온 길(auto/pick/smart). 자동 곡 기록에 쓴다
-  autoInfo: new Map(), howOf: new Map(), autoRun: 0 };
+  autoInfo: new Map(), howOf: new Map(), autoRun: 0,
+  // 이 대기열에서 절반 넘게 들은 곡, 30초 안에 넘긴 곡 (믹스 기준 고르기에 쓴다)
+  heard: new Set(), skipped: new Set() };
 const current = () => Q.list[Q.i] || null;
 
 function shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -1488,7 +1490,7 @@ function applyShuffle() {
 }
 function setQueue(list, i, source = 'list', ctx = null) {
   logLeave('new');
-  Q.autoInfo.clear(); Q.howOf.clear(); Q.autoRun = 0;
+  Q.autoInfo.clear(); Q.howOf.clear(); Q.autoRun = 0; Q.heard.clear(); Q.skipped.clear();
   const mine = Q.list.slice(Q.i + 1, Q.i + 1 + Q.user);
   Q.list = list.map(slim); Q.i = i; Q.base = null;
   Q.list.splice(i + 1, 0, ...mine); Q.user = mine.length;
@@ -1547,7 +1549,7 @@ function next(auto, fromError) {
     if (counted && loopPlays < LOOP_PLAYS) { counted = false; loopPlays++; }
     player.seekTo(0, true); player.playVideo(); return;
   }
-  if (auto) logLeave('end');
+  if (auto) { if (current()) Q.heard.add(current().id); logLeave('end'); }
   smartInsert();
   if (Q.i + 1 < Q.list.length) { advance(); return playCurrent(); }
   if (useAuto()) {
@@ -1589,6 +1591,7 @@ function statFor(t) {
 }
 function noteListen() {
   const t = current(), c = curTime(), d = durTime();
+  if (t && d && c >= d / 2) Q.heard.add(t.id);
   if (counted || !t || !(c >= 30 || (d && c >= d / 2))) return;
   counted = true;
   if (store.settings.privateSession) return;
@@ -1670,12 +1673,23 @@ function weigh(items, idx) {
 function scoreOf(stat, liked) {
   return (stat ? stat.plays - 2 * stat.skips : 0) + (liked ? 3 : 0);
 }
-function minePool(stats, likedTracks) {
+// 넘기기만 하고 제대로 들은 적 없는 곡: 넘긴 번마다 0.3배 (믹스·취향 묶음에서. 값은 임시)
+const skipPenalty = stat => (stat && stat.plays === 0 ? 0.3 ** stat.skips : 1);
+// 최근성: 2시간 안에 들은 곡은 빼고(0), 30일 넘게 안 들은 곡은 1.5배 (값은 임시)
+function recency(last, now) {
+  if (!last) return 1;
+  const d = now - last;
+  return d < 2 * 3600e3 ? 0 : d > 30 * 864e5 ? 1.5 : 1;
+}
+const monthKey = ms => { const d = new Date(ms); return d.getFullYear() * 100 + d.getMonth() + 1; };
+// 내 기록 묶음: 점수에 이번 달 들은 횟수를 더하고 최근성을 곱한다
+function minePool(stats, likedTracks, now = Date.now()) {
   const liked = new Set(likedTracks.map(t => t.id));
   const pool = [];
   for (const id in stats) {
-    const w = scoreOf(stats[id], liked.has(id));
-    if (w > 0) pool.push({ t: stats[id].t, w });
+    const s = stats[id], month = s.m && s.m[0] === monthKey(now) ? s.m[1] : 0;
+    const w = (scoreOf(s, liked.has(id)) + month) * recency(s.last, now);
+    if (w > 0) pool.push({ t: s.t, w });
   }
   for (const t of likedTracks) if (!stats[t.id]) pool.push({ t, w: scoreOf(undefined, true) });
   return pool;
@@ -1924,6 +1938,31 @@ function recsSummary(log, daily, dayStats, today) {
     `직접 고른 곡 ${own}곡 · 30초 안 넘김 ${own30}곡`,
   ].join('\n');
 }
+// 비슷한 곡 목록의 기준 곡: 지금까지 튼 곡 중 뒤에서부터, 직접 고른 곡이나 절반 넘게 들은 곡만 (최대 3곡)
+// 방금 시작한 자동 곡이나 곧 넘길 곡이 다음 추천을 끌고 가지 않게 한다
+function pickSeeds(list, i, autoInfo, heard, ok = () => true) {
+  const out = [];
+  for (let k = Math.min(i, list.length - 1); k >= 0 && out.length < 3; k--) {
+    const t = list[k];
+    if (!t || out.includes(t.id) || !ok(t)) continue;
+    if (!autoInfo.has(t.id) || heard.has(t.id)) out.push(t.id);
+  }
+  return out;
+}
+// 여러 믹스를 합친다: 여러 목록에 함께 나온 곡일수록 w가 크다
+function mergeMixes(lists) {
+  const m = new Map();
+  for (const l of lists) {
+    const seen = new Set();
+    for (const t of l || []) {
+      if (!t || seen.has(t.id)) continue;
+      seen.add(t.id);
+      const x = m.get(t.id);
+      if (x) x.w++; else m.set(t.id, { t, w: 1 });
+    }
+  }
+  return [...m.values()];
+}
 // @@recs-pure-end
 
 // ---------- 자동 곡 기록 (설계 E) ----------
@@ -1947,6 +1986,7 @@ function logStart(t, how) {
 }
 // 지금 곡을 떠날 때: skip(넘김, 넘긴 때로 a~e) / new(자동 곡 도중 새 목록·다른 곡) / end(끝까지) / x(셀 수 없음)
 function logLeave(why) {
+  if (why === 'skip' && current() && curTime() < 30) dropFrom(current().id);
   if (logOpen) {
     logOpen.r = why === 'skip' ? skipBucket(curTime(), durTime()) : why === 'new' ? 'n' : why === 'end' ? 'f' : 'x';
     logOpen.ke = screenNow();
@@ -1955,6 +1995,13 @@ function logLeave(why) {
     save();
   } else if (curOwn && why === 'skip' && curTime() < 30) dayCount('own30');
   curOwn = false;
+}
+// 30초 안에 넘긴 곡: 다음 기준에서 빼고, 그 곡을 기준으로 뽑아 둔 추천도 버린다
+function dropFrom(id) {
+  Q.skipped.add(id);
+  const n = Q.auto.length;
+  Q.auto = Q.auto.filter(t => (Q.autoInfo.get(t.id) || {}).seedId !== id);
+  if (Q.auto.length !== n) Q.autoEpoch++;
 }
 function logWhy(no, why) {
   const l = store.autoLog.find(x => x.no === no);
@@ -2056,24 +2103,32 @@ function refillAuto() {
     // 싫어요 곡은 믹스를 가져올 기준(지금 곡, 내 취향, 최근에 들은 곡)으로 쓰지 않는다
     const ok = t => !idx.ids.has(t.id);
     const mine = weigh(minePool(B.stats, B.liked), idx);
-    const seed = [...Q.list].reverse().find(ok);
+    const seeds = pickSeeds(Q.list, Q.i, Q.autoInfo, Q.heard, t => ok(t) && !Q.skipped.has(t.id));
     const exclude = new Set([...store.recent.slice(0, 20), ...store.video.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
     const top = mine.filter(x => ok(x.t)).sort((a, b) => b.w - a.w).slice(0, 10);
     const tasteSeed = top.length ? top[Math.floor(Math.random() * top.length)].t.id : null;
-    let [mix, taste, popular] = await Promise.all([seed ? fetchMix(seed.id) : [], tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
-    if (mix.filter(t => !exclude.has(t.id)).length < 5) {
+    let [mixes, taste, popular] = await Promise.all([Promise.all(seeds.map(fetchMix)), tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
+    let fullSeed = '';
+    if (mergeMixes(mixes).filter(x => !exclude.has(x.t.id)).length < 5) {
       // 기준 곡 믹스가 거의 떨어졌으면 가장 최근에 제대로 들은 곡의 믹스로 보충
-      const lastHeard = Object.values(B.stats).filter(x => x.plays > 0 && ok(x.t) && (!seed || x.t.id !== seed.id)).sort((a, b) => b.last - a.last)[0];
-      if (lastHeard) mix = mix.concat(await fetchMix(lastHeard.t.id));
+      const lastHeard = Object.values(B.stats).filter(x => x.plays > 0 && ok(x.t) && !seeds.includes(x.t.id) && !Q.skipped.has(x.t.id)).sort((a, b) => b.last - a.last)[0];
+      if (lastHeard) { fullSeed = lastHeard.t.id; seeds.push(fullSeed); mixes.push(await fetchMix(fullSeed)); }
     }
+    // 후보마다 어느 기준 곡의 믹스에서 왔는지 (그 기준 곡을 30초 안에 넘기면 버린다)
+    const seedOf = new Map();
+    seeds.forEach((sid, k) => { for (const t of mixes[k]) if (!seedOf.has(t.id)) seedOf.set(t.id, sid); });
+    const mix = mergeMixes(mixes);
     if (token !== autoToken() || !(useAuto() || smartOn())) return;
     const open = l => l.filter(x => !artistBlocked(x.t));
-    const pools = { mine: open(mine), mix: open(weigh(mix, idx)), taste: open(weigh(taste, idx)), popular: open(weigh(popular, idx)) };
+    const lower = l => l.map(x => ({ ...x, w: x.w * skipPenalty(B.stats[x.t.id]) }));
+    const pools = { mine: open(mine), mix: open(lower(weigh(mix, idx))), taste: open(lower(weigh(taste, idx))), popular: open(weigh(popular, idx)) };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
       if (!p) break;
       Q.auto.push(slim(p.t)); exclude.add(p.t.id);
-      Q.autoInfo.set(p.t.id, { from: p.from, p: Math.round(p.p * 100) / 100, seed: p.from === 'mix' ? (seed && Q.autoInfo.has(seed.id) ? 'auto' : 'own') : p.from === 'taste' ? 'taste' : 'none', kp: recKind() });
+      const sid = p.from === 'mix' ? seedOf.get(p.t.id) || '' : p.from === 'taste' ? tasteSeed : '';
+      const seedKind = p.from === 'mix' ? (sid === fullSeed || Q.autoInfo.has(sid) ? 'full' : 'own') : p.from === 'taste' ? 'taste' : 'none';
+      Q.autoInfo.set(p.t.id, { from: p.from, p: Math.round(p.p * 100) / 100, seed: seedKind, seedId: sid, kp: recKind() });
     }
     Q.autoEmpty = !Q.auto.length;
     renderQueue();
