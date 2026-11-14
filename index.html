@@ -257,6 +257,11 @@
   .chip { height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,.07); color: #fff; font-size: 14px; white-space: nowrap; flex: none; }
   .chip:hover { background: rgba(255,255,255,.12); }
   .chip.on { background: #fff; color: #000; }
+  /* 넘길 때 이유·하루 질문: 재생 줄 위에 잠깐 뜨는 글자 단추 (음악 화면 안에만 있다) */
+  .recs-ask { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); z-index: 80; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; max-width: min(720px, calc(100vw - 32px)); padding: 10px 12px; border-radius: 8px; background: #282828; color: #fff; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  .recs-ask[hidden] { display: none; }
+  .recs-ask > span { margin-right: 4px; color: #b3b3b3; }
+  .recs-ask .chip { height: 28px; font-size: 13px; }
   .lib-tools { display: flex; justify-content: space-between; align-items: center; padding: 0 16px 4px 12px; gap: 8px; color: var(--sub); }
   .lib-tools button { display: flex; align-items: center; gap: 6px; height: 32px; color: var(--sub); font-size: 14px; }
   .lib-tools button:hover { color: #fff; }
@@ -892,6 +897,7 @@
     <div id="queue" class="m-queue" hidden></div>
     <div id="friends" hidden></div>
   </aside>
+  <div id="recs-ask" class="recs-ask" hidden></div>
   <footer class="m-bar">
     <div class="now" id="now"></div>
     <div class="ctl">
@@ -1885,6 +1891,39 @@ function dayKey(ms) {
   const d = new Date(ms), z = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
 }
+// 넘길 때 고르는 이유 (코드, 글자)
+const REASONS = {
+  music: [['genre', '장르가 안 맞음'], ['idol', '아이돌 곡이라'], ['recent', '방금 들은 곡'], ['dup', '같은 곡 다른 판'], ['mood', '지금 기분 아님'], ['notmusic', '노래가 아님'], ['none', '그냥']],
+  video: [['chan', '관심 없는 채널'], ['music', '노래가 나옴'], ['recent', '방금 본 영상'], ['mood', '지금 기분 아님'], ['none', '그냥']],
+};
+const PATH_NAMES = { mine: '내 기록', mix: '비슷한 곡', taste: '취향', artist: '가수', popular: '인기', chan: '같은 채널', fav: '자주 본 채널' };
+const SCREEN_NAMES = { music: '음악', video: '영상', doc: '문서', quick: '빠른 패널' };
+// 설정의 '내 추천 기록'과 복사 단추 글: 최근 14일 숫자만 (곡 정보 없음)
+function recsSummary(log, daily, dayStats, today) {
+  const from = dayKey(Date.parse(today + 'T12:00:00') - 13 * 864e5);
+  const L = (log || []).filter(l => l.d >= from && l.d <= today);
+  const fast = l => l.r === 'a' || l.r === 'b';
+  const count = (key, names) => {
+    const m = {};
+    for (const l of L) { const k = key(l); if (k) (m[k] = m[k] || { n: 0, f: 0 }), m[k].n++, fast(l) && m[k].f++; }
+    return Object.entries(m).map(([k, v]) => `${names(k)} ${v.n}곡(넘김 ${v.f})`).join(' · ') || '없음';
+  };
+  const why = {};
+  for (const l of L) if (l.why) { const k = l.kp === 'video' ? 'video' : 'music', name = (REASONS[k].find(x => x[0] === l.why) || [, l.why])[1]; why[name] = (why[name] || 0) + 1; }
+  const days = Object.entries(daily || {}).filter(([d, v]) => d >= from && v > 0).sort().map(([d, v]) => `${d.slice(5)} ${v}점`);
+  let own = 0, own30 = 0;
+  for (const [d, v] of Object.entries(dayStats || {})) if (d >= from) { own += v.own || 0; own30 += v.own30 || 0; }
+  const f = L.filter(fast).length;
+  return [
+    `추천 기록 (최근 14일, 판 ${RECS_V})`,
+    `자동 곡 ${L.length}곡 · 30초 안 넘김 ${f}곡${L.length ? ` (${Math.round(f / L.length * 100)}%)` : ''}`,
+    `경로: ${count(l => l.from, k => PATH_NAMES[k] || k)}`,
+    `화면: ${count(l => l.ks, k => SCREEN_NAMES[k] || k)}`,
+    `이유: ${Object.entries(why).map(([k, v]) => `${k} ${v}`).join(' · ') || '없음'}`,
+    `하루 점수: ${days.join(' · ') || '없음'}`,
+    `직접 고른 곡 ${own}곡 · 30초 안 넘김 ${own30}곡`,
+  ].join('\n');
+}
 // @@recs-pure-end
 
 // ---------- 자동 곡 기록 (설계 E) ----------
@@ -1903,6 +1942,7 @@ function logStart(t, how) {
   if (store.autoLog.length > LOG_MAX) store.autoLog.splice(0, store.autoLog.length - LOG_MAX);
   logOpen = line; curOwn = false;
   save();
+  maybeAskDaily();
   return line.no;
 }
 // 지금 곡을 떠날 때: skip(넘김, 넘긴 때로 a~e) / new(자동 곡 도중 새 목록·다른 곡) / end(끝까지) / x(셀 수 없음)
@@ -1910,6 +1950,7 @@ function logLeave(why) {
   if (logOpen) {
     logOpen.r = why === 'skip' ? skipBucket(curTime(), durTime()) : why === 'new' ? 'n' : why === 'end' ? 'f' : 'x';
     logOpen.ke = screenNow();
+    if ('abc'.includes(logOpen.r) && logOpen.r) showReasons(logOpen);
     logOpen = null;
     save();
   } else if (curOwn && why === 'skip' && curTime() < 30) dayCount('own30');
@@ -1919,6 +1960,34 @@ function logWhy(no, why) {
   const l = store.autoLog.find(x => x.no === no);
   if (l) { l.why = why; save(); }
 }
+// ---------- 넘길 때 이유, 하루 질문 (음악 화면에서만) ----------
+let askTimer = 0, askNo = 0;
+const askEl = () => $('#recs-ask');
+const askable = () => mode === 'music' && !quickOpen;
+function hideAsk() { clearTimeout(askTimer); askNo = 0; askEl().hidden = true; askEl().innerHTML = ''; }
+function showReasons(line) {
+  if (!askable()) return;
+  line.rs = 1; askNo = line.no;
+  const k = line.kp === 'video' ? 'video' : 'music';
+  askEl().innerHTML = `<span>왜 넘겼어요?</span>${REASONS[k].map(([c, l]) => `<button class="chip" data-why="${c}">${l}</button>`).join('')}`;
+  askEl().hidden = false;
+  clearTimeout(askTimer); askTimer = setTimeout(hideAsk, 8000);
+}
+function maybeAskDaily() {
+  if (!askable() || askNo || !askEl().hidden || store.settings.privateSession) return;
+  const d = dayKey(Date.now());
+  if (d in store.daily || store.autoLog.filter(l => l.d === d).length <= 5) return;
+  askEl().innerHTML = `<span>오늘 자동으로 나온 곡, 어땠어요?</span>${[1, 2, 3, 4, 5].map(v => `<button class="chip" data-day="${v}">${v}</button>`).join('')}<button class="chip" data-day="0">닫기</button>`;
+  askEl().hidden = false;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('#recs-ask button');
+  if (!b) return;
+  if (b.dataset.why && askNo) logWhy(askNo, b.dataset.why);
+  if (b.dataset.day) { store.daily[dayKey(Date.now())] = +b.dataset.day; save(); }
+  hideAsk();
+});
+
 // 직접 고른 곡의 하루 합계 (최근 30일만 둔다)
 function dayCount(k) {
   if (store.settings.privateSession) return;
@@ -2052,6 +2121,7 @@ let mode = 'doc', quickOpen = false, route = { name: 'home' }, lastRoute = { nam
 function setMode(m) {
   mode = m;
   $('#music').hidden = m !== 'music';
+  if (m === 'music') setTimeout(maybeAskDaily, 0); else hideAsk();
   if (m === 'music') {
     // 포커스가 문서에 남아 있으면 음악 화면에서 누른 키가 숨은 문서에 입력된다
     const a = document.activeElement;
@@ -2891,6 +2961,10 @@ function renderSettings(el) {
     ${setRow('재생 속도', '', `<select data-speed>${[0.75, 1, 1.25, 1.5, 2].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}배</option>`).join('')}</select>`)}
     <h2>청취 활동</h2>
     ${setRow('비공개 세션', '켜 두면 듣는 곡이 기록과 추천에 안 남고 친구에게도 안 보여요', boolBox('privateSession', !!store.settings.privateSession))}
+    <h2>내 추천 기록</h2>
+    <p class="m-hint" style="white-space:pre-line">${esc(recsSummary(store.autoLog, store.daily, store.dayStats, dayKey(Date.now())))}</p>
+    <p class="m-hint">곡 이름 없이 숫자만 있어요. 추천을 고치는 데 써요.</p>
+    <div class="actions"><button class="pill" data-act="recscopy">숫자 복사하기</button></div>
     <h2>다른 사람에게 보이는 정보</h2>
     ${setRow('친구에게 듣는 곡 보여 주기', '친구 활동에 지금 듣는 곡이 나와요', boolBox('shareListening', store.settings.shareListening !== false))}
     <h2>검색</h2>
@@ -3836,6 +3910,11 @@ document.addEventListener('click', e => {
     }
     case 'speedset': setSpeed(+id); hideMenu(); break;
     case 'jump': jumpTo(i); break;
+    case 'recscopy': {
+      const text = recsSummary(store.autoLog, store.daily, store.dayStats, dayKey(Date.now()));
+      navigator.clipboard.writeText(text).then(() => toast('복사했어요'), () => toast('복사하지 못했어요'));
+      break;
+    }
     case 'autoplaynow': {
       const [t] = Q.auto.splice(i, 1);
       logLeave('skip'); // 추천 칸에서 다른 곡을 눌러 넘김
