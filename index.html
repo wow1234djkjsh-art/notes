@@ -1053,9 +1053,12 @@ const setting = k => store.settings[k] || CONFIG[k];
 delete store.settings.searchUrl;
 // 예전엔 대기열 패널만 있어서 켜고 끄는 값만 저장했다
 if ('showQueue' in store) { store.panel = store.showQueue ? 'queue' : ''; delete store.showQueue; }
-// 영상/음악: 음악 화면에서 📺 영상 화면이 열려 있으면 영상, 그 밖(음악 화면, 빠른 패널)은 음악.
+// 영상/음악: 음악 화면에서 영상 화면 셋(📺 영상 칸, 영상 검색, 좋아요한 영상)이 열려 있으면 영상, 그 밖(음악 화면, 빠른 패널)은 음악.
 // 기록·좋아요·싫어요는 쪽마다 따로: 음악은 store 최상위(옛 데이터 그대로), 영상은 store.video
-const kind = () => (mode === 'music' && route.name === 'video' ? 'video' : 'music');
+const kind = () => (mode === 'music' && videoScreen() ? 'video' : 'music');
+// 자동 추천의 쪽: 영상 화면이라도 지금 곡이 노래로 보이면 음악 쪽 (노래를 듣다 뮤직비디오를 열어도 노래가 이어진다)
+const autoKind = () => (kind() === 'video' && !looksMusic(current()) ? 'video' : 'music');
+const looksMusic = t => !!t && (musicLike(t) >= 1 || channelKind(t.channel, store.stats, store.video.stats) === 'music');
 const bucket = (k = kind()) => (k === 'video' ? store.video : store);
 const slim = t => ({ id: t.id, title: t.title, channel: t.channel, duration: t.duration, seconds: t.seconds });
 
@@ -1517,6 +1520,7 @@ function playCurrent() {
     save();
   }
   renderTrackChange();
+  onKindChange(); // 영상 화면에서 노래 ↔ 영상으로 바뀌면 추천도 바꾼다
   refillAuto();
 }
 const advance = () => { Q.i++; if (Q.user > 0) Q.user--; };
@@ -1575,7 +1579,9 @@ function next(auto, fromError) {
 }
 function pause() { if (playerReady) player.pauseVideo(); }
 function endOfList(auto) {
-  if (store.repeat === 'all' || !auto) { Q.i = 0; playCurrent(); } else renderTrackChange();
+  // 영상 쪽 자동 재생은 이어 볼 영상이 없으면 멈춘다. 다음 버튼도 처음(=방금 본 영상)으로 돌아가지 않는다
+  const stop = useAuto() && recKind() === 'video';
+  if (store.repeat === 'all' || (!auto && !stop)) { Q.i = 0; playCurrent(); } else renderTrackChange();
 }
 // 재생 기록: 30초 이상 또는 절반 이상 들으면 곡당 한 번 plays, 처음 30초 안에 다음 버튼이면 skips
 let counted = false, loopPlays = 0;
@@ -1969,13 +1975,81 @@ function isAltCut(t) { return false; }
 function artistCandidates(tracks, stats, name) {
   return (tracks || []).filter(t => t && hasArtist(t, name) && !(stats || {})[t.id] && t.seconds >= 60 && t.seconds <= 600 && !isAltCut(t));
 }
+// ---- 음악·영상 나누기 (설계 A) ----
+// 영상 쪽 경로: chan 같은 채널, fav 자주 본 채널, mine 내 영상 기록 다시 (값은 임시)
+const VIDEO_WEIGHTS = { chan: 50, fav: 45, mine: 5 };
+const HANGUL = /[가-힣ㄱ-ㅎㅏ-ㅣ]/;
+const GAME_KO = ['게임', '마인크래프트', '배그', '발로란트', '공략', '실황'];
+const GAME_EN = /\b(gameplay|let'?s\s*play|walkthrough|speedrun)\b/i;
+const MUSIC_WORDS = /(^|[^a-z])m\/?v([^a-z]|$)|official\s+(audio|video)|\blyrics?\b|뮤직비디오|가사|해석|번역|한글자막/i;
+// 한글 낱말은 앞뒤가 한글이 아닐 때만 센다 ('게임방송'의 게임은 안 센다)
+function hasKoWord(s, w) {
+  for (let i = s.indexOf(w); i >= 0; i = s.indexOf(w, i + 1)) if (!HANGUL.test(s[i - 1] || '') && !HANGUL.test(s[i + w.length] || '')) return true;
+  return false;
+}
+const isGameTitle = title => GAME_KO.some(w => hasKoWord(title, w)) || GAME_EN.test(title);
+// 노래 단서 점수: Topic 채널 +2, VEVO 채널이나 제목의 MV·가사 따위 +1, 게임 낱말 −2, 15분 넘음 −1
+function musicLike(t) {
+  if (!t) return 0;
+  const title = String(t.title || ''), ch = String(t.channel || '');
+  let n = 0;
+  if (/\s-\sTopic$/i.test(ch)) n += 2;
+  if (/VEVO$/i.test(ch) || MUSIC_WORDS.test(title)) n += 1;
+  if (isGameTitle(title)) n -= 2;
+  if (t.seconds > 900) n -= 1;
+  return n;
+}
+// 채널 판정: 두 기록에서 그 채널의 노래 증거(1~10분이거나 음악 쪽 기록)와 영상 증거(10분 넘음이거나 영상 쪽 기록)를 센다
+function channelKind(name, music, video) {
+  if (!name || name === LINK_CHANNEL) return '';
+  let m = 0, v = 0;
+  for (const [stats, isVideo] of [[music, false], [video, true]]) for (const id in stats || {}) {
+    const t = stats[id] && stats[id].t;
+    if (!t || t.channel !== name) continue;
+    const sec = t.seconds || 0;
+    if (!isVideo || (sec >= 60 && sec <= 600)) m++;
+    if (isVideo || sec > 600) v++;
+  }
+  return m > v ? 'music' : v > m ? 'video' : '';
+}
+// 시리즈 번호: 'N화', 'N편', 'EP N', '#N'
+const EP_RE = /(\d+)\s*(화|편)|\b(EP)\.?\s?(\d+)|#(\d+)/i;
+function episodeOf(title) {
+  const m = EP_RE.exec(title || '');
+  return m ? { n: +(m[1] || m[4] || m[5]), m } : null;
+}
+// 제목의 줄기 낱말: 괄호 속과 시리즈 번호, 기호를 빼고 앞 세 낱말
+function titleStem(title) {
+  return String(title || '').replace(/\[[^\]]*\]|\([^)]*\)|【[^】]*】|<[^>]*>/g, ' ').replace(new RegExp(EP_RE.source, 'gi'), ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
+}
+// 다음 화 검색어: '채널 줄기 (N+1)화' 꼴. 번호가 없으면 null
+function nextEpisodeQuery(title, channel) {
+  const e = episodeOf(title);
+  if (!e) return null;
+  const { m } = e, next = m[1] ? (e.n + 1) + m[2] : m[4] ? m[3] + ' ' + (e.n + 1) : '#' + (e.n + 1);
+  return [channel, titleStem(title), next].filter(Boolean).join(' ');
+}
+// 영상 기록에서 본 횟수 상위 채널
+function topChannels(stats, n) {
+  const by = new Map();
+  for (const s of Object.values(stats || {})) {
+    const ch = s && s.t && s.t.channel;
+    if (!(s.plays > 0) || !ch || ch === LINK_CHANNEL) continue;
+    const a = by.get(ch) || { name: ch, plays: 0, t: s.t, top: 0 };
+    a.plays += s.plays;
+    if (s.plays > a.top) { a.top = s.plays; a.t = s.t; }
+    by.set(ch, a);
+  }
+  return [...by.values()].sort((a, b) => b.plays - a.plays).slice(0, n);
+}
 // @@recs-pure-end
 
 // ---------- 자동 곡 기록 (설계 E) ----------
 // 자동 곡마다 한 줄: 틀기 시작할 때 쓰고, 넘기거나 끝날 때 결과를 고친다. 곡 ID·제목은 넣지 않는다. 개인 세션이면 아무것도 안 남긴다
 const LOG_MAX = 2000;
 let logOpen = null, curOwn = false;
-const recKind = () => kind();
+const recKind = () => autoKind();
 const screenNow = () => (quickOpen ? 'quick' : mode !== 'music' ? 'doc' : kind());
 const chForm = c => (/\s-\sTopic$/i.test(c || '') ? 'topic' : /VEVO$/.test(c || '') ? 'vevo' : 'other');
 function logStart(t, how) {
@@ -2052,6 +2126,49 @@ function dayCount(k) {
   save();
 }
 
+// ---------- 자동 추천: 쪽마다 거르기, 영상 쪽 채우기 (설계 A) ----------
+// 길이를 모르는 곡(링크로 넣은 곡)은 길이로는 거르지 않는다
+const musicOk = t => !!t && (!t.seconds || (t.seconds >= 60 && t.seconds <= 600)) && musicLike(t) > -1 && channelKind(t.channel, store.stats, store.video.stats) !== 'video';
+const videoOk = t => !!t && (!t.seconds || t.seconds >= 60) && musicLike(t) < 1 && channelKind(t.channel, store.stats, store.video.stats) !== 'music' && !store.blocked[t.id];
+// 영상 쪽 검색: 예비 서버로 안 나가고 11자 채널 이름을 영상 ID로 읽지 않는다. 탭 동안 기억하되 실패는 안 기억한다
+const videoCache = new Map();
+function videoSearch(q) {
+  if (!videoCache.has(q)) videoCache.set(q, search(q, { backup: false, link: false }).catch(() => { videoCache.delete(q); return []; }));
+  return videoCache.get(q);
+}
+async function fillVideo(token) {
+  const B = store.video, cur = current(), idx = dislikeIndex(B.disliked);
+  const exclude = new Set([...store.recent.slice(0, 20), ...store.video.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
+  const ch = cur && cur.channel && cur.channel !== LINK_CHANNEL ? cur.channel : '';
+  const epQ = ch ? nextEpisodeQuery(cur.title, ch) : null;
+  const favs = topChannels(B.stats, 5).filter(c => c.name !== ch);
+  const fav = favs.length ? favs[Math.floor(Math.random() * favs.length)] : null;
+  const [ep, chan, favList] = await Promise.all([
+    epQ ? videoSearch(epQ) : [],
+    ch ? videoSearch(`${ch} ${titleStem(cur.title)}`.trim()) : [],
+    fav ? videoSearch(`${fav.name} ${titleStem(fav.t.title)}`.trim()) : [],
+  ]);
+  if (token !== autoToken() || !(useAuto() || smartOn())) return;
+  const same = (l, name) => l.filter(t => t && t.channel === name && videoOk(t));
+  const pools = {
+    chan: weigh(same([...ep, ...chan], ch), idx),
+    fav: fav ? weigh(same(favList, fav.name), idx) : [],
+    mine: weigh(minePool(B.stats, B.liked), idx).filter(x => videoOk(x.t)),
+  };
+  const put = (t, from, p) => { Q.autoInfo.set(t.id, { from, p: Math.round(p * 100) / 100, seed: 'none', seedId: '', kp: 'video' }); exclude.add(t.id); };
+  // 시리즈는 순서대로: 다음 번호가 있으면 맨 앞에
+  const e = episodeOf(cur && cur.title);
+  const nextEp = e && same(ep, ch).find(t => !exclude.has(t.id) && (episodeOf(t.title) || {}).n === e.n + 1);
+  if (nextEp) { Q.auto.unshift(slim(nextEp)); put(nextEp, 'chan', 1); }
+  while (Q.auto.length < 5) {
+    const p = pickNext(pools, VIDEO_WEIGHTS, exclude, Math.random);
+    if (!p) break;
+    Q.auto.push(slim(p.t)); put(p.t, p.from, p.p);
+  }
+  Q.autoEmpty = !Q.auto.length;
+  renderQueue();
+}
+
 // ---------- 자동 추천 (대기열 연결) ----------
 const autoplayOn = () => store.settings.autoplay !== false;
 // 검색에서 시작했으면 전체 반복이어도 추천을 계속한다
@@ -2097,14 +2214,15 @@ const fetchPopular = () => popularP || (popularP = search('인기 음악', { bac
   .then(r => { if (!r.length) popularP = null; return r; }));
 let refilling = null, refillingToken = '';
 // 채우는 도중 대기열이 바뀌거나 추천이 무효가 되거나 영상/음악 쪽이 바뀌면 결과를 버린다
-const autoToken = () => Q.gen + ':' + Q.autoEpoch + ':' + kind();
+const autoToken = () => Q.gen + ':' + Q.autoEpoch + ':' + autoKind();
 function refillAuto() {
   // 이전 대기열(또는 무효가 된 추천)의 채우기가 아직 도는 중이면, 끝난 뒤 지금 기준으로 다시 채운다
   if (refilling) return refillingToken === autoToken() ? refilling : refilling.then(() => refillAuto());
   if (!(useAuto() || smartOn()) || Q.auto.length >= 5 || !current() || (!smartOn() && Q.list.length - Q.i - 1 > 2)) return Promise.resolve();
   const token = refillingToken = autoToken();
   refilling = (async () => {
-    const B = bucket();
+    if (recKind() === 'video') return fillVideo(token);
+    const B = bucket('music');
     B.disliked.filter(d => !(d.similar && d.similar.length) && (d.tries || 0) < 3).slice(0, 3).forEach(fillSimilar);
     const idx = dislikeIndex(B.disliked);
     // 싫어요 곡은 믹스를 가져올 기준(지금 곡, 내 취향, 최근에 들은 곡)으로 쓰지 않는다
@@ -2131,7 +2249,7 @@ function refillAuto() {
     seeds.forEach((sid, k) => { for (const t of mixes[k]) if (!seedOf.has(t.id)) seedOf.set(t.id, sid); });
     const mix = mergeMixes(mixes);
     if (token !== autoToken() || !(useAuto() || smartOn())) return;
-    const open = l => l.filter(x => !artistBlocked(x.t));
+    const open = l => l.filter(x => !artistBlocked(x.t) && musicOk(x.t));
     const lower = l => l.map(x => ({ ...x, w: x.w * skipPenalty(B.stats[x.t.id]) }));
     const pools = { mine: open(mine), mix: open(lower(weigh(mix, idx))), taste: open(lower(weigh(taste, idx))), artist: open(weigh(artist, idx)) };
     while (Q.auto.length < 5) {
@@ -2209,8 +2327,8 @@ function setMode(m) {
 // 영상/음악 쪽이 바뀌면 지금 추천은 버리고 그쪽 기준으로 다시 채운다
 let lastKind = 'music';
 function onKindChange() {
-  if (kind() === lastKind) return;
-  lastKind = kind();
+  if (autoKind() === lastKind) return;
+  lastKind = autoKind();
   Q.auto = []; Q.autoEpoch++;
   refillAuto(); renderQueue();
 }
