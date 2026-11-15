@@ -1992,7 +1992,8 @@ function logStart(t, how) {
 }
 // 지금 곡을 떠날 때: skip(넘김, 넘긴 때로 a~e) / new(자동 곡 도중 새 목록·다른 곡) / end(끝까지) / x(셀 수 없음)
 function logLeave(why) {
-  if (why === 'skip' && current() && curTime() < 30) dropFrom(current().id);
+  // 자동 곡(추천 칸에서 고른 곡 포함)을 30초 안에 넘겼을 때만. 직접 고른 곡은 넘겨도 그 곡의 믹스를 계속 쓴다
+  if (why === 'skip' && current() && curTime() < 30 && Q.autoInfo.has(current().id)) dropFrom(current().id);
   if (logOpen) {
     logOpen.r = why === 'skip' ? skipBucket(curTime(), durTime()) : why === 'new' ? 'n' : why === 'end' ? 'f' : 'x';
     logOpen.ke = screenNow();
