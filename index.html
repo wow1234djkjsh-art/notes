@@ -2858,7 +2858,8 @@ async function albumApi(body) {
 const albumTitle = n => String(n ?? '').replace(/\s+-\s+(?:Single|EP)$/i, '');
 const albumKind = n => (/\s-\s+Single$/i.test(n) ? '싱글' : /\s-\s+EP$/i.test(n) ? 'EP' : '앨범');
 const coverOk = c => (/^https:\/\/[\w.-]+\.mzstatic\.com\/[\w\-./%]+$/.test(c || '') ? c : '');
-const albumRecord = h => ({ n: albumTitle(h.n), id: h.id, aid: h.aid, c: coverOk(h.c), y: h.y, no: h.no, disc: h.disc });
+// g: 애플 장르 이름 (추천 개편 F. 2단계에서 사람별 장르 비율에 쓴다)
+const albumRecord = h => ({ n: albumTitle(h.n), id: h.id, aid: h.aid, c: coverOk(h.c), y: h.y, no: h.no, disc: h.disc, g: typeof h.g === 'string' ? h.g.slice(0, 40) : '' });
 const VERSION_TITLE = /\b(?:inst(?:rumental)?|karaoke|live|ver(?:sion)?|remix|cover)\b|노래방|반주|라이브|커버|엠알/i, VERSION_ALBUM = /\b(?:karaoke|live|cover|piano|music box|orgel)\b|노래방|반주|라이브|콘서트|엠알|오르골/i;
 const isVersion = s => VERSION_TITLE.test(s) || /\bMR\b/.test(s);
 const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]/;
