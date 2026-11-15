@@ -1648,8 +1648,8 @@ function setVolume(v) {
 
 // ---------- 자동 추천 (순수 함수) ----------
 // @@autoplay-pure-start
-// mine: 내 기록, mix: 지금 곡의 YouTube 믹스, taste: 내 취향 곡의 믹스, popular: 인기 음악
-const AUTO_WEIGHTS = { mine: 50, mix: 30, taste: 15, popular: 5 };
+// mine: 내 기록, mix: 지금 곡의 YouTube 믹스, taste: 내 취향 곡의 믹스, artist: 아는 가수의 안 들어 본 곡 (인기 음악은 뺐다. 비중은 임시)
+const AUTO_WEIGHTS = { mine: 50, mix: 30, taste: 15, artist: 5 };
 // 싫어요: 아예 막지 않고 덜 나오게. 그 곡 자체, 같은 채널, 그 곡 YouTube 믹스에 있던 곡 (해당되면 곱해짐)
 const DISLIKE = { self: 0.1, artist: 0.5, similar: 0.8 };
 // 링크로 붙여 넣은 곡의 채널 자리 (가수가 아니므로 같은 가수 감점에서 뺀다)
@@ -1963,6 +1963,12 @@ function mergeMixes(lists) {
   }
   return [...m.values()];
 }
+// 같은 곡의 딴 판(라이브, 리믹스 등)인지: 작업 8에서 채운다. 그 전에는 늘 아니다
+function isAltCut(t) { return false; }
+// 가수 경로 후보: 그 가수의 곡이고, 들은 적 없고, 1~10분이고, 딴 판이 아닌 곡
+function artistCandidates(tracks, stats, name) {
+  return (tracks || []).filter(t => t && hasArtist(t, name) && !(stats || {})[t.id] && t.seconds >= 60 && t.seconds <= 600 && !isAltCut(t));
+}
 // @@recs-pure-end
 
 // ---------- 자동 곡 기록 (설계 E) ----------
@@ -2107,7 +2113,12 @@ function refillAuto() {
     const exclude = new Set([...store.recent.slice(0, 20), ...store.video.recent.slice(0, 20), ...Q.list, ...Q.auto].map(t => t.id).concat([...Q.removed]));
     const top = mine.filter(x => ok(x.t)).sort((a, b) => b.w - a.w).slice(0, 10);
     const tasteSeed = top.length ? top[Math.floor(Math.random() * top.length)].t.id : null;
-    let [mixes, taste, popular] = await Promise.all([Promise.all(seeds.map(fetchMix)), tasteSeed ? fetchMix(tasteSeed) : [], fetchPopular()]);
+    // 가수 경로: 많이 들은 가수와 팔로우한 가수 중 하나를 골라 그 가수의 곡 (음악 쪽만. 검색이 실패하면 비어 있다)
+    const singers = [];
+    if (recKind() === 'music') for (const n of [...topArtists(B.stats, 5).map(a => a.name), ...store.following.map(a => a.name)]) if (n && !singers.some(x => sameArtist(x, n))) singers.push(n);
+    const singer = singers.length ? singers[Math.floor(Math.random() * singers.length)] : '';
+    let [mixes, taste, artistTop] = await Promise.all([Promise.all(seeds.map(fetchMix)), tasteSeed ? fetchMix(tasteSeed) : [], singer ? loadArtist(singer).then(d => d.top) : []]);
+    const artist = singer ? artistCandidates(artistTop, B.stats, singer) : [];
     let fullSeed = '';
     if (mergeMixes(mixes).filter(x => !exclude.has(x.t.id)).length < 5) {
       // 기준 곡 믹스가 거의 떨어졌으면 가장 최근에 제대로 들은 곡의 믹스로 보충
@@ -2121,7 +2132,7 @@ function refillAuto() {
     if (token !== autoToken() || !(useAuto() || smartOn())) return;
     const open = l => l.filter(x => !artistBlocked(x.t));
     const lower = l => l.map(x => ({ ...x, w: x.w * skipPenalty(B.stats[x.t.id]) }));
-    const pools = { mine: open(mine), mix: open(lower(weigh(mix, idx))), taste: open(lower(weigh(taste, idx))), popular: open(weigh(popular, idx)) };
+    const pools = { mine: open(mine), mix: open(lower(weigh(mix, idx))), taste: open(lower(weigh(taste, idx))), artist: open(weigh(artist, idx)) };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
       if (!p) break;
