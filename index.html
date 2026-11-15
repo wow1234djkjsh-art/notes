@@ -1975,8 +1975,52 @@ function mergeMixes(lists) {
   }
   return [...m.values()];
 }
-// 같은 곡의 딴 판(라이브, 리믹스 등)인지: 작업 8에서 채운다. 그 전에는 늘 아니다
-function isAltCut(t) { return false; }
+// ---- 같은 곡·딴 판 (설계 D) ----
+// 딴 판: 배속·느리게·나이트코어·8D·1시간 반복·직캠·교차편집·음악방송 무대. 앨범 맞추기의 VERSION_TITLE과는 따로 둔다
+// (리믹스·라이브·clean은 딴 판이 아니다. 같은 곡으로만 센다)
+const ALT_CUT = /sped\s*up|spedup|배속|slowed|reverb|nightcore|\b8d\b|(?<!\d)1\s*(?:시간|hours?)\b|(?<!\d)1\s*시간|무한\s*반복|직캠|fancam|교차\s*편집|음악중심|인기가요|엠카운트다운|뮤직뱅크|쇼챔피언|show!?\s*music\s*core|inkigayo|m\s*countdown|music\s*bank|show\s*champion/i;
+// 노래방·MR·반주·instrumental·karaoke는 괄호 안에 있거나 노래방 채널일 때만 (곡 이름에 그 낱말이 든 곡이 있다)
+const ALT_BRACKET = /노래방|반주|\bMR\b|\binst(?:rumental)?\b|karaoke/i;
+function isAltCut(t) {
+  const title = String(t && t.title || ''), ch = String(t && t.channel || '');
+  if (ALT_CUT.test(title)) return true;
+  if ((title.match(BRACKET) || []).some(b => ALT_BRACKET.test(b))) return true;
+  return /노래방|karaoke/i.test(ch);
+}
+// 곡 이름 별칭: 괄호 밖 이름과 괄호 속 다른 이름('뚜두뚜두 (DDU-DU DDU-DU)'). 괄호 없는 피처링 꼬리와 해석·번역 꼬리표는 뺀다.
+// 'Pt. 2' 같은 속편 표시는 이름의 일부로 남긴다. 라이브·리믹스·피처링 같은 괄호는 별칭이 아니다 (다른 곡 둘이 같은 꼬리를 달 수 있다)
+const NOT_ALIAS = /\b(?:live|remix|ver(?:sion)?|inst(?:rumental)?|acoustic|clean|explicit|feat|ft|featuring|prod|sped|slowed|remaster(?:ed)?|mix|edit|cover|karaoke|mr|demo|bonus|with)\b|라이브|리믹스|버전|반주|해석|번역|가사|자막|노래방/i;
+const SEQUEL = /\b(?:pt|part)\.?\s*\d+/i;
+function songNames(title) {
+  let s = String(title ?? '').replace(BRACKET, b => (SEQUEL.test(b) ? ' ' + b.slice(1, -1) + ' ' : b));
+  s = s.replace(/\s*[\/|ㅣ]?\s*(?:가사\s*)?(?:해석|번역|한글\s*자막)\s*$/, '').replace(/\s+(?:feat|ft|featuring)\b\.?\s.*$/i, '');
+  const out = [artistKey(s.replace(BRACKET, ' ').replace(/\s+/g, ' ').trim())];
+  for (const b of s.match(BRACKET) || []) if (!NOT_ALIAS.test(b)) out.push(artistKey(b));
+  return out.filter(Boolean);
+}
+const sameTitle = (a, b) => { const x = songNames(a), y = songNames(b); return x.some(n => y.includes(n)); };
+// 같은 곡: 가수 별칭이 하나라도 겹치고 곡 이름 별칭이 하나라도 같으면. '곡 - 가수' 순서로 올린 것도 본다
+function sameSong(a, b) {
+  if (!a || !b) return false;
+  if (a.id === b.id) return true;
+  const x = meta(a), y = meta(b);
+  const artists = sameArtist(x.artist, y.artist) || artistsOf(a).some(p => artistsOf(b).some(q => sameArtist(p.name, q.name)));
+  if (artists && sameTitle(x.title, y.title)) return true;
+  return sameArtist(x.artist, y.title) && sameTitle(x.title, y.artist);
+}
+const isTopic = t => /\s-\sTopic$/i.test(String(t && t.channel || ''));
+// 후보({t,w}나 곡)에서 최근 곡·대기열·추천 칸과 같은 곡을 빼고, 같은 곡 후보끼리는 Topic 채널 것을 남긴다
+function dedupe(cands, recent) {
+  const out = [], tr = x => x.t || x;
+  for (const x of cands || []) {
+    const t = tr(x);
+    if ((recent || []).some(r => sameSong(r, t))) continue;
+    const k = out.findIndex(y => sameSong(tr(y), t));
+    if (k < 0) out.push(x);
+    else if (isTopic(t) && !isTopic(tr(out[k]))) out[k] = x;
+  }
+  return out;
+}
 // 가수 경로 후보: 그 가수의 곡이고, 들은 적 없고, 1~10분이고, 딴 판이 아닌 곡
 function artistCandidates(tracks, stats, name) {
   return (tracks || []).filter(t => t && hasArtist(t, name) && !(stats || {})[t.id] && t.seconds >= 60 && t.seconds <= 600 && !isAltCut(t));
@@ -2268,10 +2312,16 @@ function refillAuto() {
     if (token !== autoToken() || !(useAuto() || smartOn())) return;
     const open = l => l.filter(x => !artistBlocked(x.t) && musicOk(x.t));
     const lower = l => l.map(x => ({ ...x, w: x.w * skipPenalty(B.stats[x.t.id]) }));
-    const pools = { mine: open(mine), mix: open(lower(weigh(mix, idx))), taste: open(lower(weigh(taste, idx))), artist: open(weigh(artist, idx)) };
+    // 같은 곡·딴 판 거르기는 새 후보 경로에만. 내 기록은 내가 들은 판 그대로 다시 나온다
+    // 대기열은 지금 곡 앞뒤 25곡만 (긴 재생목록에서 비교가 너무 많아지지 않게. 같은 ID는 exclude가 따로 막는다)
+    const heardList = [...store.recent.slice(0, 20), ...Q.list.slice(Math.max(0, Q.i - 25), Q.i + 25), ...Q.auto];
+    const fresh = l => dedupe(l.filter(x => !isAltCut(x.t)), heardList);
+    const pools = { mine: open(mine), mix: fresh(open(lower(weigh(mix, idx)))), taste: fresh(open(lower(weigh(taste, idx)))), artist: fresh(open(weigh(artist, idx))) };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
       if (!p) break;
+      // 다른 경로에서 이번에 이미 뽑은 곡과 같은 곡이면 건너뛴다
+      if (p.from !== 'mine' && Q.auto.some(a => sameSong(a, p.t))) { exclude.add(p.t.id); continue; }
       Q.auto.push(slim(p.t)); exclude.add(p.t.id);
       const sid = p.from === 'mix' ? seedOf.get(p.t.id) || '' : p.from === 'taste' ? tasteSeed : '';
       const seedKind = p.from === 'mix' ? (sid === fullSeed || Q.autoInfo.has(sid) ? 'full' : 'own') : p.from === 'taste' ? 'taste' : 'none';
