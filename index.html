@@ -1432,7 +1432,9 @@ window.onYouTubeIframeAPIReady = () => {
         }
         renderPlayState();
       },
-      onError: () => {
+      onError: e => {
+        // 101·150: 올린 사람이 다른 사이트에서 재생을 막은 영상. 자동 추천에서 뺀다
+        if (e && (e.data === 101 || e.data === 150) && current()) blockVideo(current().id);
         logLeave('x');
         errorStreak++;
         autoToast('재생할 수 없는 영상이라 건너뛰어요');
@@ -1508,6 +1510,7 @@ function playCurrent() {
   const t = current();
   if (!t) return;
   counted = false; loopPlays = 0;
+  Q.playKind = kind();
   logLeave('x'); // 분류 못 한 채 바뀐 곡
   const how = Q.howOf.get(t.id);
   Q.howOf.delete(t.id);
@@ -1515,7 +1518,7 @@ function playCurrent() {
   pumpAlbums();
   if (playerReady) player.loadVideoById(t.id); else pendingId = t.id;
   if (!store.settings.privateSession) {
-    const B = bucket();
+    const B = bucket(Q.playKind);
     B.recent = [slim(t), ...B.recent.filter(x => x.id !== t.id)].slice(0, 30);
     save();
   }
@@ -1588,7 +1591,7 @@ let counted = false, loopPlays = 0;
 const LOOP_PLAYS = 3;
 const STATS_MAX = 500;
 function statFor(t) {
-  const stats = bucket().stats;
+  const stats = bucket(Q.playKind || kind()).stats; // 틀기 시작한 쪽에 기록 (숨기거나 화면을 바꿔도)
   const s = stats[t.id] || (stats[t.id] = { t: slim(t), plays: 0, skips: 0, last: 0 });
   s.last = Date.now();
   const ids = Object.keys(stats);
@@ -1660,17 +1663,20 @@ const AUTO_WEIGHTS = { mine: 50, mix: 30, taste: 15, artist: 5 };
 const DISLIKE = { self: 0.1, artist: 0.5, similar: 0.8 };
 // 링크로 붙여 넣은 곡의 채널 자리 (가수가 아니므로 같은 가수 감점에서 뺀다)
 const LINK_CHANNEL = '링크로 추가';
-function dislikeIndex(disliked) {
-  const idx = { ids: new Set(), channels: new Set(), similar: new Set() };
+// namesOf: 곡의 가수 이름들 (기본은 채널 이름 하나). 음악 화면은 합동 곡의 가수마다 나눈 이름을 넘긴다
+const channelNames = t => [t.channel];
+function dislikeIndex(disliked, namesOf = channelNames) {
+  const idx = { ids: new Set(), names: new Set(), similar: new Set(), namesOf };
   for (const d of disliked) {
     idx.ids.add(d.t.id);
-    if (d.t.channel && d.t.channel !== LINK_CHANNEL) idx.channels.add(d.t.channel);
+    if (d.t.channel && d.t.channel !== LINK_CHANNEL) for (const n of namesOf(d.t)) if (n) idx.names.add(n);
     for (const id of Array.isArray(d.similar) ? d.similar : []) idx.similar.add(id);
   }
   return idx;
 }
-function penaltyOf(t, idx) {
-  return (idx.ids.has(t.id) ? DISLIKE.self : 1) * (idx.channels.has(t.channel) ? DISLIKE.artist : 1) * (idx.similar.has(t.id) ? DISLIKE.similar : 1);
+function penaltyOf(t, idx, namesOf = idx.namesOf || channelNames) {
+  const artist = namesOf(t).some(n => n && idx.names.has(n));
+  return (idx.ids.has(t.id) ? DISLIKE.self : 1) * (artist ? DISLIKE.artist : 1) * (idx.similar.has(t.id) ? DISLIKE.similar : 1);
 }
 // 곡 목록(Track 또는 {t,w})을 싫어요 반영한 {t,w,w0}로. w0은 감점 전 값 (묶음 비중 계산에 씀)
 function weigh(items, idx) {
@@ -2045,6 +2051,16 @@ function topChannels(stats, n) {
 }
 // @@recs-pure-end
 
+// 재생이 막힌 영상 { id: 때 } (최대 500, 오래된 것부터 버림)
+const BLOCKED_MAX = 500;
+function blockVideo(id) {
+  if (store.settings.privateSession) return;
+  store.blocked[id] = Date.now();
+  const ids = Object.keys(store.blocked);
+  if (ids.length > BLOCKED_MAX) ids.sort((a, b) => store.blocked[a] - store.blocked[b]).slice(0, ids.length - BLOCKED_MAX).forEach(k => delete store.blocked[k]);
+  save();
+}
+
 // ---------- 자동 곡 기록 (설계 E) ----------
 // 자동 곡마다 한 줄: 틀기 시작할 때 쓰고, 넘기거나 끝날 때 결과를 고친다. 곡 ID·제목은 넣지 않는다. 개인 세션이면 아무것도 안 남긴다
 const LOG_MAX = 2000;
@@ -2128,7 +2144,7 @@ function dayCount(k) {
 
 // ---------- 자동 추천: 쪽마다 거르기, 영상 쪽 채우기 (설계 A) ----------
 // 길이를 모르는 곡(링크로 넣은 곡)은 길이로는 거르지 않는다
-const musicOk = t => !!t && (!t.seconds || (t.seconds >= 60 && t.seconds <= 600)) && musicLike(t) > -1 && channelKind(t.channel, store.stats, store.video.stats) !== 'video';
+const musicOk = t => !!t && (!t.seconds || (t.seconds >= 60 && t.seconds <= 600)) && musicLike(t) > -1 && channelKind(t.channel, store.stats, store.video.stats) !== 'video' && !store.blocked[t.id];
 const videoOk = t => !!t && (!t.seconds || t.seconds >= 60) && musicLike(t) < 1 && channelKind(t.channel, store.stats, store.video.stats) !== 'music' && !store.blocked[t.id];
 // 영상 쪽 검색: 예비 서버로 안 나가고 11자 채널 이름을 영상 ID로 읽지 않는다. 탭 동안 기억하되 실패는 안 기억한다
 const videoCache = new Map();
@@ -2224,7 +2240,8 @@ function refillAuto() {
     if (recKind() === 'video') return fillVideo(token);
     const B = bucket('music');
     B.disliked.filter(d => !(d.similar && d.similar.length) && (d.tries || 0) < 3).slice(0, 3).forEach(fillSimilar);
-    const idx = dislikeIndex(B.disliked);
+    // 같은 가수 감점: 'A & B' 곡도 A를 싫어요 했으면 걸린다
+    const idx = dislikeIndex(B.disliked, t => artistsOf(t).map(a => artistKey(a.name)));
     // 싫어요 곡은 믹스를 가져올 기준(지금 곡, 내 취향, 최근에 들은 곡)으로 쓰지 않는다
     const ok = t => !idx.ids.has(t.id);
     const mine = weigh(minePool(B.stats, B.liked), idx);
