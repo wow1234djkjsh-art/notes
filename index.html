@@ -4669,10 +4669,21 @@ chatPoll();
 // 1분마다 이 브라우저가 아직 승인돼 있나 본다. 탭이 안 보여도 본다: 내보낸 기기가 1분 안에 나가게.
 // 401(내보냄·승인 취소·로그인 끝남)이면 재생을 멈추고 새로 연다 → 러버블이 대기 화면이나 로그인 화면을 보여 준다.
 // 다른 탭이 이어받아 멈춘 탭은 묻지 않는다 (같은 브라우저라 이어받은 탭이 본다)
-let kickedOnce = false;
+// 새로 연 지 10분 안에 또 401이 오면 다시 새로 열지 않는다. 새로 열었는데 이 화면이 또 떴다면 화면을 보낸 서버는 들여보낸 것이고,
+// 401은 다른 판이 답한 것이다(러버블이 옛 판과 새 판을 섞어 답할 때). 그대로 두면 새로 열기가 되풀이되며 재생이 계속 멈춘다.
+// 진짜로 내보낸 기기는 새로 열면 대기 화면이 떠서 이 코드가 다시 돌지 않는다. 알림은 화면마다 한 번만
+const KICK_KEY = 'sm.kickAt', KICK_QUIET_MS = 600000;
+let kickedOnce = false, kickTold = false;
 function kicked() {
   if (kickedOnce) return;
+  let last = 0;
+  try { last = Number(sessionStorage.getItem(KICK_KEY)) || 0; } catch (e) {}
+  if (Date.now() - last < KICK_QUIET_MS) {
+    if (!kickTold) { kickTold = true; toast('연결이 고르지 않아요. 잠시 뒤에 새로고침해 주세요'); }
+    return;
+  }
   kickedOnce = true;
+  try { sessionStorage.setItem(KICK_KEY, String(Date.now())); } catch (e) {}
   pause();
   location.reload();
 }
