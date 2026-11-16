@@ -3223,10 +3223,6 @@ function renderSettings(el) {
     ${setRow('재생 속도', '', `<select data-speed>${[0.75, 1, 1.25, 1.5, 2].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}배</option>`).join('')}</select>`)}
     <h2>청취 활동</h2>
     ${setRow('비공개 세션', '켜 두면 듣는 곡이 기록과 추천에 안 남고 친구에게도 안 보여요', boolBox('privateSession', !!store.settings.privateSession))}
-    <h2>내 추천 기록</h2>
-    <p class="m-hint" style="white-space:pre-line">${esc(recsSummary(store.autoLog, store.daily, store.dayStats, dayKey(Date.now())))}</p>
-    <p class="m-hint">곡 이름 없이 숫자만 있어요. 추천을 고치는 데 써요.</p>
-    <div class="actions"><button class="pill" data-act="recscopy">숫자 복사하기</button></div>
     <h2>다른 사람에게 보이는 정보</h2>
     ${setRow('친구에게 듣는 곡 보여 주기', '친구 활동에 지금 듣는 곡이 나와요', boolBox('shareListening', store.settings.shareListening !== false))}
     <h2>검색</h2>
@@ -3234,6 +3230,10 @@ function renderSettings(el) {
     <label class="set-col">예비 검색 서버<input type="text" data-setting="invidious" value="${esc(store.settings.invidious || '')}" placeholder="${esc(CONFIG.invidious)}"></label>
     <h2>긴급 탈출</h2>
     <label class="set-col">긴급 탈출로 이동할 주소<input type="text" data-setting="panicUrl" value="${esc(store.settings.panicUrl || '')}" placeholder="${esc(CONFIG.panicUrl)}"></label>
+    <h2>내 추천 기록</h2>
+    <p class="m-hint" style="white-space:pre-line">${esc(recsSummary(store.autoLog, store.daily, store.dayStats, dayKey(Date.now())))}</p>
+    <p class="m-hint">곡 이름 없이 숫자만 있어요. 추천을 고치는 데 써요.</p>
+    <div class="actions"><button class="pill" data-act="recscopy">숫자 복사하기</button></div>
     <h2>도움말</h2>
     <div class="actions"><button class="pill" data-doc="keys">단축키 보기 (Ctrl+/)</button><button class="pill" data-doc="log">업데이트 내역</button></div>
   </div></div>`;
