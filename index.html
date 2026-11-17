@@ -258,7 +258,7 @@
   .chip:hover { background: rgba(255,255,255,.12); }
   .chip.on { background: #fff; color: #000; }
   /* 넘길 때 이유·하루 질문: 재생 줄 위에 잠깐 뜨는 글자 단추 (음악 화면 안에만 있다) */
-  .recs-ask { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%); z-index: 80; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; max-width: min(720px, calc(100vw - 32px)); padding: 10px 12px; border-radius: 8px; background: #282828; color: #fff; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+  .recs-ask { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); z-index: 80; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; max-width: min(720px, calc(100vw - 32px)); padding: 10px 12px; border-radius: 8px; background: #282828; color: #fff; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
   .recs-ask[hidden] { display: none; }
   .recs-ask > span { margin-right: 4px; color: #b3b3b3; }
   .recs-ask .chip { height: 28px; font-size: 13px; }
@@ -1057,7 +1057,9 @@ if ('showQueue' in store) { store.panel = store.showQueue ? 'queue' : ''; delete
 // 기록·좋아요·싫어요는 쪽마다 따로: 음악은 store 최상위(옛 데이터 그대로), 영상은 store.video
 const kind = () => (mode === 'music' && videoScreen() ? 'video' : 'music');
 // 자동 추천의 쪽: 영상 화면이라도 지금 곡이 노래로 보이면 음악 쪽 (노래를 듣다 뮤직비디오를 열어도 노래가 이어진다)
-const autoKind = () => (kind() === 'video' && !looksMusic(current()) ? 'video' : 'music');
+const autoKind = () => (kind() === 'video' && Q.playKind !== 'music' && !looksMusic(current()) ? 'video' : 'music');
+// 지금 곡의 좋아요·싫어요·기록은 틀기 시작한 쪽 (노래를 들으며 영상 검색 칸에 가도 노래 쪽)
+const curKind = () => Q.playKind || kind();
 const looksMusic = t => !!t && (musicLike(t) >= 1 || channelKind(t.channel, store.stats, store.video.stats) === 'music');
 const bucket = (k = kind()) => (k === 'video' ? store.video : store);
 const slim = t => ({ id: t.id, title: t.title, channel: t.channel, duration: t.duration, seconds: t.seconds });
@@ -1583,7 +1585,7 @@ function next(auto, fromError) {
       if (gen !== Q.gen) return;
       Q.waiting = false;
       if (Q.i + 1 < Q.list.length) { advance(); return playCurrent(); } // 기다리는 동안 "다음에 재생"으로 넣은 곡
-      if (takeAuto()) playCurrent(); else if (!fromError) endOfList(auto); else pause();
+      if (takeAuto()) playCurrent(); else if (!fromError) endOfList(auto); else { pause(); autoToast('이어 틀 곡을 찾지 못했어요'); }
     });
     return;
   }
@@ -1987,13 +1989,13 @@ function mergeMixes(lists) {
 // ---- 같은 곡·딴 판 (설계 D) ----
 // 딴 판: 배속·느리게·나이트코어·8D·1시간 반복·직캠·교차편집·음악방송 무대. 앨범 맞추기의 VERSION_TITLE과는 따로 둔다
 // (리믹스·라이브·clean은 딴 판이 아니다. 같은 곡으로만 센다)
-const ALT_CUT = /sped\s*up|spedup|배속|slowed|reverb|nightcore|\b8d\b|(?<!\d)1\s*(?:시간|hours?)\b|(?<!\d)1\s*시간|무한\s*반복|직캠|fancam|교차\s*편집|음악중심|인기가요|엠카운트다운|뮤직뱅크|쇼챔피언|show!?\s*music\s*core|inkigayo|m\s*countdown|music\s*bank|show\s*champion/i;
+const ALT_CUT = /sped\s*up|spedup|배속|slowed|reverb|nightcore|\b8d\b|(?<!\d)1\s*(?:시간|hours?)\b|(?<!\d)1\s*시간|무한\s*반복|직캠|fancam|교차\s*편집|음악중심|인기가요|엠카운트다운|뮤직뱅크|쇼챔피언|show!?\s*music\s*core|inkigayo|\bm\s*countdown|music\s*bank|show\s*champion/i;
 // 노래방·MR·반주·instrumental·karaoke는 괄호 안에 있거나 노래방 채널일 때만 (곡 이름에 그 낱말이 든 곡이 있다)
-const ALT_BRACKET = /노래방|반주|\bMR\b|\binst(?:rumental)?\b|karaoke/i;
+const ALT_BRACKET = /노래방|반주|\binst(?:rumental)?\b|karaoke/i, ALT_MR = /\bMR\b/; // 'Mr. Chu'는 이름이라 MR만 대문자로
 function isAltCut(t) {
   const title = String(t && t.title || ''), ch = String(t && t.channel || '');
   if (ALT_CUT.test(title)) return true;
-  if ((title.match(BRACKET) || []).some(b => ALT_BRACKET.test(b))) return true;
+  if ((title.match(BRACKET) || []).some(b => ALT_BRACKET.test(b) || ALT_MR.test(b))) return true;
   return /노래방|karaoke/i.test(ch);
 }
 // 곡 이름 별칭: 괄호 밖 이름과 괄호 속 다른 이름('뚜두뚜두 (DDU-DU DDU-DU)'). 괄호 없는 피처링 꼬리와 해석·번역 꼬리표는 뺀다.
@@ -2007,15 +2009,31 @@ function songNames(title) {
   for (const b of s.match(BRACKET) || []) if (!NOT_ALIAS.test(b)) out.push(artistKey(b));
   return out.filter(Boolean);
 }
-const sameTitle = (a, b) => { const x = songNames(a), y = songNames(b); return x.some(n => y.includes(n)); };
+// 곡마다 비교용 이름 표를 한 번만 만든다: an 가수 줄 이름, all 가수 줄·피처링 가수 모두, ti 곡 이름, ta 곡 이름을 가수로 본 것, sa 가수 줄을 곡 이름으로 본 것
+// 곡 묶음(객체)마다 기억한다: 믹스 결과·최근 목록·대기열의 곡은 같은 객체가 계속 쓰인다
+const songKeys = new WeakMap();
+function songKey(t) {
+  let v = songKeys.get(t);
+  if (v && v.title === t.title && v.channel === t.channel) return v;
+  const m = meta(t), an = artistNames(m.artist);
+  v = { title: t.title, channel: t.channel, an, all: [...new Set([...an, ...artistsOf(t).flatMap(a => artistNames(a.name))])], ti: songNames(m.title), ta: artistNames(m.title), sa: songNames(m.artist) };
+  songKeys.set(t, v);
+  return v;
+}
+const overlap = (x, y) => x.some(n => y.includes(n));
 // 같은 곡: 가수 별칭이 하나라도 겹치고 곡 이름 별칭이 하나라도 같으면. '곡 - 가수' 순서로 올린 것도 본다
 function sameSong(a, b) {
   if (!a || !b) return false;
   if (a.id === b.id) return true;
-  const x = meta(a), y = meta(b);
-  const artists = sameArtist(x.artist, y.artist) || artistsOf(a).some(p => artistsOf(b).some(q => sameArtist(p.name, q.name)));
-  if (artists && sameTitle(x.title, y.title)) return true;
-  return sameArtist(x.artist, y.title) && sameTitle(x.title, y.artist);
+  const x = songKey(a), y = songKey(b);
+  return (overlap(x.all, y.all) && overlap(x.ti, y.ti)) || (overlap(x.an, y.ta) && overlap(x.ti, y.sa));
+}
+// 커버: 괄호 속 cover·커버, 'cover by', '커버곡', 낱말 '커버'(디스커버리 안의 것은 아님). 괄호 없는 'Take Cover' 같은 곡 이름은 아니다
+function isCover(t) {
+  const title = String(t && t.title || '');
+  // 끝의 'Cover'는 한글 제목 뒤('밤편지 Cover')나 '가수 - 곡 Cover' 꼴일 때만 ('Take Cover'는 곡 이름)
+  const tail = /\bcover\s*$/i.test(title) && (HANGUL.test(title) || /\s[-–—]\s/.test(title));
+  return (title.match(BRACKET) || []).some(b => /\bcover(?:ed)?\b|커버/i.test(b)) || /\bcover(?:ed)?\s+by\b/i.test(title) || tail || /커버곡/.test(title) || hasKoWord(title, '커버');
 }
 const isTopic = t => /\s-\sTopic$/i.test(String(t && t.channel || ''));
 // 후보({t,w}나 곡)에서 최근 곡·대기열·추천 칸과 같은 곡을 빼고, 같은 곡 후보끼리는 Topic 채널 것을 남긴다
@@ -2039,38 +2057,56 @@ function artistCandidates(tracks, stats, name) {
 const VIDEO_WEIGHTS = { chan: 50, fav: 45, mine: 5 };
 const HANGUL = /[가-힣ㄱ-ㅎㅏ-ㅣ]/;
 const GAME_KO = ['게임', '마인크래프트', '배그', '발로란트', '공략', '실황'];
+// '오징어 게임 OST'의 게임, '콘서트 실황'의 실황은 게임이 아니다
+const NOT_GAME = { '게임': /^\s*(?:2\s*)?(?:ost|사운드\s*트랙)/i, '실황': null };
+const NOT_GAME_BEFORE = { '실황': /(?:콘서트|공연|라이브|무대|단독)\s*$/ };
 const GAME_EN = /\b(gameplay|let'?s\s*play|walkthrough|speedrun)\b/i;
-const MUSIC_WORDS = /(^|[^a-z])m\/?v([^a-z]|$)|official\s+(audio|video)|\blyrics?\b|뮤직비디오|가사|해석|번역|한글자막/i;
-// 한글 낱말은 앞뒤가 한글이 아닐 때만 센다 ('게임방송'의 게임은 안 센다)
-function hasKoWord(s, w) {
-  for (let i = s.indexOf(w); i >= 0; i = s.indexOf(w, i + 1)) if (!HANGUL.test(s[i - 1] || '') && !HANGUL.test(s[i + w.length] || '')) return true;
+// 노래 단서: MV·Official Audio/Video·lyrics·뮤직비디오는 그것만으로, '가사'는 낱말로 있을 때(휴가사진·가사도우미는 아님)나 '가사해석'.
+// 해석·번역·한글자막은 영화 해석, 번역 게임 영상에도 흔해서 노래·팝송·song이 같이 있을 때만 센다
+const MUSIC_WORDS = /(^|[^a-z])m\/?v([^a-z]|$)|official\s+(audio|video)|\blyrics?\b|뮤직\s*비디오|가사\s*(?:해석|번역)/i;
+const MUSIC_WEAK = /해석|번역|한글\s*자막/, MUSIC_CONTEXT = /노래|팝송|\bsongs?\b/i;
+// 한글 낱말은 앞뒤가 한글이 아닐 때만 센다 ('게임방송'의 게임은 안 센다). after·before: 그 뒤·앞이 이 꼴이면 안 센다
+function hasKoWord(s, w, after, before) {
+  for (let i = s.indexOf(w); i >= 0; i = s.indexOf(w, i + 1)) {
+    if (HANGUL.test(s[i - 1] || '') || HANGUL.test(s[i + w.length] || '')) continue;
+    if (after && after.test(s.slice(i + w.length))) continue;
+    if (before && before.test(s.slice(0, i))) continue;
+    return true;
+  }
   return false;
 }
-const isGameTitle = title => GAME_KO.some(w => hasKoWord(title, w)) || GAME_EN.test(title);
+const isGameTitle = title => GAME_KO.some(w => hasKoWord(title, w, NOT_GAME[w], NOT_GAME_BEFORE[w])) || GAME_EN.test(title);
+const musicClue = title => MUSIC_WORDS.test(title) || hasKoWord(title, '가사') || (MUSIC_WEAK.test(title) && MUSIC_CONTEXT.test(title));
 // 노래 단서 점수: Topic 채널 +2, VEVO 채널이나 제목의 MV·가사 따위 +1, 게임 낱말 −2, 15분 넘음 −1
 function musicLike(t) {
   if (!t) return 0;
   const title = String(t.title || ''), ch = String(t.channel || '');
   let n = 0;
   if (/\s-\sTopic$/i.test(ch)) n += 2;
-  if (/VEVO$/i.test(ch) || MUSIC_WORDS.test(title)) n += 1;
+  if (/VEVO$/i.test(ch) || musicClue(title)) n += 1;
   if (isGameTitle(title)) n -= 2;
   if (t.seconds > 900) n -= 1;
   return n;
 }
 // 채널 판정: 두 기록에서 그 채널의 노래 증거(1~10분이거나 음악 쪽 기록)와 영상 증거(10분 넘음이거나 영상 쪽 기록)를 센다
-function channelKind(name, music, video) {
-  if (!name || name === LINK_CHANNEL) return '';
-  let m = 0, v = 0;
+// 채널마다 한 번에 센 표 { 채널: {m, v} }. 한 번 채울 때 한 번만 만든다 (후보마다 기록 전체를 훑지 않게)
+function channelTable(music, video) {
+  const tb = new Map();
   for (const [stats, isVideo] of [[music, false], [video, true]]) for (const id in stats || {}) {
     const t = stats[id] && stats[id].t;
-    if (!t || t.channel !== name) continue;
-    const sec = t.seconds || 0;
-    if (!isVideo || (sec >= 60 && sec <= 600)) m++;
-    if (isVideo || sec > 600) v++;
+    if (!t || !t.channel) continue;
+    const e = tb.get(t.channel) || { m: 0, v: 0 }, sec = t.seconds || 0;
+    if (!isVideo || (sec >= 60 && sec <= 600)) e.m++;
+    if (isVideo || sec > 600) e.v++;
+    tb.set(t.channel, e);
   }
-  return m > v ? 'music' : v > m ? 'video' : '';
+  return tb;
 }
+function kindIn(tb, name) {
+  const e = name && name !== LINK_CHANNEL ? tb.get(name) : null;
+  return !e ? '' : e.m > e.v ? 'music' : e.v > e.m ? 'video' : '';
+}
+const channelKind = (name, music, video) => kindIn(channelTable(music, video), name);
 // 시리즈 번호: 'N화', 'N편', 'EP N', '#N'
 const EP_RE = /(\d+)\s*(화|편)|\b(EP)\.?\s?(\d+)|#(\d+)/i;
 function episodeOf(title) {
@@ -2160,7 +2196,7 @@ function logWhy(no, why) {
 // ---------- 넘길 때 이유, 하루 질문 (음악 화면에서만) ----------
 let askTimer = 0, askNo = 0;
 const askEl = () => $('#recs-ask');
-const askable = () => mode === 'music' && !quickOpen;
+const askable = () => mode === 'music' && !quickOpen && !fsOpen; // 전체 화면 영상 위에는 안 띄운다
 function hideAsk() { clearTimeout(askTimer); askNo = 0; askEl().hidden = true; askEl().innerHTML = ''; }
 function showReasons(line) {
   if (!askable()) return;
@@ -2197,8 +2233,11 @@ function dayCount(k) {
 
 // ---------- 자동 추천: 쪽마다 거르기, 영상 쪽 채우기 (설계 A) ----------
 // 길이를 모르는 곡(링크로 넣은 곡)은 길이로는 거르지 않는다
-const musicOk = t => !!t && (!t.seconds || (t.seconds >= 60 && t.seconds <= 600)) && musicLike(t) > -1 && channelKind(t.channel, store.stats, store.video.stats) !== 'video' && !store.blocked[t.id];
-const videoOk = t => !!t && (!t.seconds || t.seconds >= 60) && musicLike(t) < 1 && channelKind(t.channel, store.stats, store.video.stats) !== 'music' && !store.blocked[t.id];
+// tb: channelTable (한 번 채울 때 한 번 만들어 넘긴다)
+const musicOk = (t, tb) => !!t && (!t.seconds || (t.seconds >= 60 && t.seconds <= 600)) && musicLike(t) > -1 && kindIn(tb, t.channel) !== 'video' && !store.blocked[t.id];
+const videoOk = (t, tb) => !!t && (!t.seconds || t.seconds >= 60) && musicLike(t) < 1 && kindIn(tb, t.channel) !== 'music' && !store.blocked[t.id] && !artistBlocked(t);
+// 느린 검색을 기다리다 다른 경로까지 묶이지 않게: ms 안에 안 오면 빈 값
+const inTime = (p, ms, empty) => Promise.race([p, new Promise(r => setTimeout(() => r(empty), ms))]);
 // 영상 쪽 검색: 예비 서버로 안 나가고 11자 채널 이름을 영상 ID로 읽지 않는다. 탭 동안 기억하되 실패는 안 기억한다
 const videoCache = new Map();
 function videoSearch(q) {
@@ -2218,13 +2257,14 @@ async function fillVideo(token) {
     fav ? videoSearch(`${fav.name} ${titleStem(fav.t.title)}`.trim()) : [],
   ]);
   if (token !== autoToken() || !(useAuto() || smartOn())) return;
-  const same = (l, name) => l.filter(t => t && t.channel === name && videoOk(t));
+  const tb = channelTable(store.stats, store.video.stats);
+  const same = (l, name) => l.filter(t => t && t.channel === name && videoOk(t, tb));
   const pools = {
     chan: weigh(same([...ep, ...chan], ch), idx),
     fav: fav ? weigh(same(favList, fav.name), idx) : [],
-    mine: weigh(minePool(B.stats, B.liked), idx).filter(x => videoOk(x.t)),
+    mine: weigh(minePool(B.stats, B.liked), idx).filter(x => videoOk(x.t, tb)),
   };
-  const put = (t, from, p) => { Q.autoInfo.set(t.id, { from, p: Math.round(p * 100) / 100, seed: 'none', seedId: '', kp: 'video' }); exclude.add(t.id); };
+  const put = (t, from, p) => { Q.autoInfo.set(t.id, { from, p: Math.round(p * 1e4) / 1e4, seed: 'none', seedId: '', kp: 'video' }); exclude.add(t.id); };
   // 시리즈는 순서대로: 다음 번호가 있으면 맨 앞에
   const e = episodeOf(cur && cur.title);
   const nextEp = e && same(ep, ch).find(t => !exclude.has(t.id) && (episodeOf(t.title) || {}).n === e.n + 1);
@@ -2304,9 +2344,9 @@ function refillAuto() {
     const tasteSeed = top.length ? top[Math.floor(Math.random() * top.length)].t.id : null;
     // 가수 경로: 많이 들은 가수와 팔로우한 가수 중 하나를 골라 그 가수의 곡 (음악 쪽만. 검색이 실패하면 비어 있다)
     const singers = [];
-    if (recKind() === 'music') for (const n of [...topArtists(B.stats, 5).map(a => a.name), ...store.following.map(a => a.name)]) if (n && !singers.some(x => sameArtist(x, n))) singers.push(n);
+    if (recKind() === 'music') for (const n of [...topArtists(B.stats, 5).map(a => a.name), ...store.following.map(a => a.name)]) if (n && !singers.some(x => sameArtist(x, n)) && !B.disliked.some(d => hasArtist(d.t, n))) singers.push(n);
     const singer = singers.length ? singers[Math.floor(Math.random() * singers.length)] : '';
-    let [mixes, taste, artistTop] = await Promise.all([Promise.all(seeds.map(fetchMix)), tasteSeed ? fetchMix(tasteSeed) : [], singer ? loadArtist(singer).then(d => d.top) : []]);
+    let [mixes, taste, artistTop] = await Promise.all([Promise.all(seeds.map(fetchMix)), tasteSeed ? fetchMix(tasteSeed) : [], singer ? inTime(loadArtist(singer).then(d => d.top), 4000, []) : []]);
     const artist = singer ? artistCandidates(artistTop, B.stats, singer) : [];
     let fullSeed = '';
     if (mergeMixes(mixes).filter(x => !exclude.has(x.t.id)).length < 5) {
@@ -2319,12 +2359,16 @@ function refillAuto() {
     seeds.forEach((sid, k) => { for (const t of mixes[k]) if (!seedOf.has(t.id)) seedOf.set(t.id, sid); });
     const mix = mergeMixes(mixes);
     if (token !== autoToken() || !(useAuto() || smartOn())) return;
-    const open = l => l.filter(x => !artistBlocked(x.t) && musicOk(x.t));
+    const tb = channelTable(store.stats, store.video.stats);
+    const open = l => l.filter(x => !artistBlocked(x.t) && musicOk(x.t, tb));
     const lower = l => l.map(x => ({ ...x, w: x.w * skipPenalty(B.stats[x.t.id]) }));
     // 같은 곡·딴 판 거르기는 새 후보 경로에만. 내 기록은 내가 들은 판 그대로 다시 나온다
     // 대기열은 지금 곡 앞뒤 25곡만 (긴 재생목록에서 비교가 너무 많아지지 않게. 같은 ID는 exclude가 따로 막는다)
     const heardList = [...store.recent.slice(0, 20), ...Q.list.slice(Math.max(0, Q.i - 25), Q.i + 25), ...Q.auto];
-    const fresh = l => dedupe(l.filter(x => !isAltCut(x.t)), heardList);
+    // 모르는 사람의 커버: 올린 채널이 많이 들은 가수나 팔로우한 가수가 아니면 뺀다
+    const known = [...topArtists(B.stats, 30).map(a => a.name), ...store.following.map(a => a.name)];
+    const stranger = t => isCover(t) && !known.some(n => sameArtist(n, cleanChannel(t.channel)));
+    const fresh = l => dedupe(l.filter(x => !isAltCut(x.t) && !stranger(x.t)), heardList);
     const pools = { mine: open(mine), mix: fresh(open(lower(weigh(mix, idx)))), taste: fresh(open(lower(weigh(taste, idx)))), artist: fresh(open(weigh(artist, idx))) };
     while (Q.auto.length < 5) {
       const p = pickNext(pools, AUTO_WEIGHTS, exclude, Math.random);
@@ -2334,7 +2378,7 @@ function refillAuto() {
       Q.auto.push(slim(p.t)); exclude.add(p.t.id);
       const sid = p.from === 'mix' ? seedOf.get(p.t.id) || '' : p.from === 'taste' ? tasteSeed : '';
       const seedKind = p.from === 'mix' ? (sid === fullSeed || Q.autoInfo.has(sid) ? 'full' : 'own') : p.from === 'taste' ? 'taste' : 'none';
-      Q.autoInfo.set(p.t.id, { from: p.from, p: Math.round(p.p * 100) / 100, seed: seedKind, seedId: sid, kp: recKind() });
+      Q.autoInfo.set(p.t.id, { from: p.from, p: Math.round(p.p * 1e4) / 1e4, seed: seedKind, seedId: sid, kp: recKind() });
     }
     Q.autoEmpty = !Q.auto.length;
     renderQueue();
@@ -3390,7 +3434,7 @@ function renderNowView() {
   const el = $('#nowview'), t = current();
   if (store.panel !== 'now') return;
   if (!t) { el.dataset.sig = ''; el.innerHTML = `<div class="rp-head"><b>지금 재생 중</b>${closeBtn}</div><div class="rp-body"><p class="m-hint">재생 중인 곡이 없어요</p></div>`; npl.lines = null; placePlayer(); return; }
-  const m = meta(t), arts = artistsOf(t), a0 = arts[0]?.name, n = nextUp(), liked = isLiked(t.id), s = bucket().stats[t.id], ctx = Q.ctx;
+  const m = meta(t), arts = artistsOf(t), a0 = arts[0]?.name, n = nextUp(), liked = isLiked(t.id, curKind()), s = bucket(curKind()).stats[t.id], ctx = Q.ctx;
   const key = lyricKey(t), sig = [t.id, t.title, liked, s?.plays, n?.id, ctx?.name, arts.map(a => +isFollowing(a.name)).join(''), key].join('|');
   if (el.dataset.sig === sig) return;
   // 같은 곡을 다시 그릴 때(재생 횟수가 오를 때 등)는 보던 자리를 지킨다
@@ -3451,7 +3495,7 @@ function renderQueue() {
 }
 
 function renderNow() {
-  const t = current(), m = t && meta(t), liked = t && isLiked(t.id), nowEl = $('#now');
+  const t = current(), m = t && meta(t), liked = t && isLiked(t.id, curKind()), nowEl = $('#now');
   const sig = t ? [t.id, t.title, liked, isDisliked(t.id)].join('|') : '';
   if (nowEl.dataset.sig !== sig || !t) nowEl.innerHTML = t ? `
     <img src="${thumb(t.id)}" alt="" data-act="panel" data-panel="now">
@@ -3777,15 +3821,21 @@ async function downloadTrack(t, fmt, d = { key: ++dlSeq, t, fmt }) {
 }
 
 // 다음 곡 버튼·Alt+. : 처음 30초 안에 넘기면 skip으로 센다
-function skipNext() { stopAlong(); if (!Q.waiting) { noteSkip(); logLeave('skip'); } next(false); }
+function skipNext() {
+  stopAlong();
+  // 영상 쪽에서 이어 볼 영상이 없으면 넘김으로 기록하지 않고 알린다 (멈추지도 처음으로 돌아가지도 않는다)
+  if (recKind() === 'video' && useAuto() && store.repeat !== 'all' && Q.i + 1 >= Q.list.length && !Q.auto.length && Q.autoEmpty && !refilling) { toast('이어 볼 영상이 없어요'); return; }
+  if (!Q.waiting) { noteSkip(); logLeave('skip'); }
+  next(false);
+}
 // 지금 곡 싫어요 (⊖ 버튼·Alt+X)
 function dislikeCurrent() {
   const t = current();
   if (!t) return;
   stopAlong();
   // 이미 싫어요면 해제. 단 넘길 추천을 기다리는 중에 또 누른 건 무시
-  if (isDisliked(t.id)) { if (!Q.waiting) toggleDislike(t); return; }
-  toggleDislike(t);
+  if (isDisliked(t.id, curKind())) { if (!Q.waiting) toggleDislike(t, curKind()); return; }
+  toggleDislike(t, curKind());
   logLeave('skip');
   // 넘길 곡이 없으면 처음(=이 곡)으로 돌아가지 않고 멈춘다
   if (Q.i + 1 < Q.list.length || useAuto() || (store.repeat === 'all' && Q.list.length > 1)) next(false, true);
@@ -4006,7 +4056,7 @@ document.addEventListener('click', e => {
     case 'radio': go({ name: 'radio', id, label: el.dataset.label, sub: el.dataset.sub }); break;
     case 'artist': go({ name: 'artist', id }); break;
     case 'like': toggleLike(lists[key][i], listKind(key)); break;
-    case 'likecur': if (current()) { toggleLike(current()); toast(isLiked(current().id) ? '좋아요 표시한 곡에 추가했어요' : '좋아요 표시한 곡에서 뺐어요'); } break;
+    case 'likecur': if (current()) { toggleLike(current(), curKind()); toast(isLiked(current().id, curKind()) ? '좋아요 표시한 곡에 추가했어요' : '좋아요 표시한 곡에서 뺐어요'); } break;
     case 'more': showMenu(el, key, i); break;
     case 'm-addto': showAddTo(el); break;
     case 'm-next': if (Q.list.length) [...menuTracks].reverse().forEach(playNext); else setQueue(menuTracks, 0); hideMenu(); break;
@@ -4898,7 +4948,7 @@ function onKey(e) {
   if (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
     if (e.code === 'Period') { e.preventDefault(); skipNext(); return; }
     if (e.code === 'Comma') { e.preventDefault(); prev(); return; }
-    if (e.code === 'KeyL') { e.preventDefault(); const t = current(); if (t) { toggleLike(t); toast(isLiked(t.id) ? '좋아요에 추가했어요' : '좋아요를 취소했어요'); } return; }
+    if (e.code === 'KeyL') { e.preventDefault(); const t = current(); if (t) { toggleLike(t, curKind()); toast(isLiked(t.id, curKind()) ? '좋아요에 추가했어요' : '좋아요를 취소했어요'); } return; }
     if (e.code === 'KeyX') { e.preventDefault(); dislikeCurrent(); return; }
   }
   if (e.key === 'Escape') {
