@@ -807,12 +807,13 @@
   .m-btns .no { color: #fff; }
 
   /* ---------- 빠른 패널 ---------- */
-  #quick { position: fixed; right: 20px; bottom: 20px; width: 340px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid #dadce0; border-radius: 12px; box-shadow: 0 6px 24px rgba(60,64,67,.25); padding: 12px; z-index: 40; font-size: 13px; color: #3c4043; }
+  #quick { position: fixed; right: 20px; bottom: 20px; width: 340px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow: auto; background: #fff; border: 1px solid #dadce0; border-radius: 12px; box-shadow: 0 6px 24px rgba(60,64,67,.25); padding: 12px; z-index: 40; font-size: 13px; color: #3c4043; }
   #quick { display: flex; flex-direction: column; }
   #quick .q-head { display: flex; justify-content: space-between; color: #5f6368; margin-bottom: 6px; cursor: move; user-select: none; touch-action: none; }
   #quick .q-actions { display: flex; align-items: center; gap: 4px; }
   #quick .q-actions button { padding: 3px 8px; border-radius: 6px; color: #5f6368; }
   #quick .q-actions button:hover { background: #e8eaed; }
+  #quick .q-actions button.active { background: #e8f0fe; color: #1967d2; }
   #quick .q-resize { position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none; border-right: 2px solid #c4c7c5; border-bottom: 2px solid #c4c7c5; border-radius: 0 0 8px 0; }
   #quick.sized ul { max-height: none; flex: 1 1 auto; min-height: 0; }
   #quick input[type=text] { width: 100%; border: 1px solid #dadce0; border-radius: 6px; padding: 8px 10px; outline: none; }
@@ -833,6 +834,22 @@
   #quick #q-lyrics[hidden] { display: none; }
   #quick #q-lyrics:not([hidden]) { display: flex; flex: 1 1 220px; min-height: 120px; max-height: 340px; overflow: auto; margin-top: 8px; border-radius: 8px; }
   #quick.sized #q-lyrics:not([hidden]) { max-height: none; min-height: 0; }
+  #q-video { margin-top: 8px; }
+  #q-video-meta { margin: 0 0 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #5f6368; }
+  #q-video-slot { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: #000; }
+  #q-video-empty { display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: 8px; background: #171717; color: #aaa; }
+  #quick #q-settings:not([hidden]) { display: block; margin-top: 6px; overflow: auto; min-height: 0; }
+  #q-settings .q-setting { display: grid; grid-template-columns: minmax(72px, 1fr) minmax(110px, 1.35fr); align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid #eee; }
+  #q-settings .q-setting > span { min-width: 0; }
+  #q-settings .q-setting select { width: 100%; min-width: 0; border: 1px solid #dadce0; border-radius: 6px; background: #fff; color: #3c4043; padding: 5px 6px; }
+  #q-settings .q-setting input[type=range] { width: 100%; }
+  #q-settings .q-setting-button { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px 2px; border-bottom: 1px solid #eee; text-align: left; }
+  #q-settings .q-setting-button:hover { color: #1967d2; }
+  #q-settings .q-settings-all { margin-top: 10px; padding: 7px 12px; border-radius: 18px; background: #e8f0fe; color: #1967d2; font-weight: 700; }
+  #quick.quick-video { z-index: 29; pointer-events: none; }
+  #quick.quick-video .q-head, #quick.quick-video #q-now { position: relative; z-index: 31; pointer-events: auto; }
+  #quick.quick-video .q-resize { z-index: 31; pointer-events: auto; }
+  #quick.quick-video #q-video { pointer-events: none; }
   #q-lyrics .q-lyr { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding: 12px; overflow: hidden; border-radius: 8px; background: #171717; color: #fff; font-size: 14px; line-height: 1.5; }
   #q-lyrics .q-lyr-meta { flex: none; padding: 0 2px 8px; border-bottom: 1px solid rgba(255,255,255,.14); }
   #q-lyrics .q-lyr-meta b, #q-lyrics .q-lyr-meta span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -965,10 +982,12 @@
 <!-- 빠른 패널 (Ctrl+J) -->
 <div id="quick" hidden>
   <div class="q-resize" title="크기 조절"></div>
-  <div class="q-head" title="끌어서 옮기기 · 두 번 누르면 원래 자리로"><span>메모</span><div class="q-actions"><button data-act="quicklyrics" id="q-lyrics-toggle" title="빠른 가사 보기">가사</button><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div></div>
+  <div class="q-head" title="끌어서 옮기기 · 두 번 누르면 원래 자리로"><span>빠른 메뉴</span><div class="q-actions"><button data-act="quickview" data-view="search" class="active" aria-pressed="true">검색</button><button data-act="quickview" data-view="lyrics" aria-pressed="false">가사</button><button data-act="quickview" data-view="video" aria-pressed="false">영상</button><button data-act="quickview" data-view="settings" aria-pressed="false">설정</button><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div></div>
   <input type="text" id="q-input" autocomplete="off" spellcheck="false">
   <ul id="q-results"></ul>
   <div id="q-lyrics" hidden></div>
+  <div id="q-video" hidden></div>
+  <div id="q-settings" hidden></div>
   <div class="q-now" id="q-now" hidden>
     <div class="q-title" id="q-title"></div>
     <div class="q-seek"><span id="q-cur">0:00</span><input type="range" id="q-seek" min="0" max="1000" value="0"><span id="q-dur">0:00</span></div>
@@ -1287,7 +1306,7 @@ const SHORTCUTS = [
     ['Alt+L', '좋아요'],
     ['Alt+X', '싫어요 (바로 다음 곡으로)'],
     ['Alt+M', '음악 화면과 문서 화면 전환'],
-    ['Ctrl+J', '빠른 패널 열기 / 닫기 (안에서 가사 보기)'],
+    ['Ctrl+J', '빠른 패널 (검색·가사·영상·설정)'],
     ['Ctrl+X 또는 Alt+K', '긴급 탈출 (진짜 Google 문서로 이동)'],
     ['Ctrl+/', '이 단축키 목록'],
     ['Esc', '메뉴·패널 닫기, 음악 화면에서는 문서로'],
@@ -1309,6 +1328,7 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 23일', [
+    'Ctrl+J 빠른 패널에서 재생 중인 영상과 자주 쓰는 재생 설정을 바로 열 수 있음',
     'Ctrl+J 빠른 패널에서 재생 중인 곡 가사를 바로 볼 수 있고, 설정에서 Google 문서풍·Spotify풍·깔끔한 모양을 고를 수 있음',
     '처음 쓰는 기기는 이름을 적고 승인을 받아야 들어올 수 있음',
     '영상 화면(영상 칸, 영상 검색, 좋아요한 영상)에서는 다음에 영상만, 노래를 들을 때는 노래만 이어서 나옴. 영상 화면에서 뮤직비디오를 틀면 노래가 이어짐',
@@ -1702,6 +1722,9 @@ function setVolume(v) {
   store.volume = Math.max(0, Math.min(100, Math.round(v)));
   if (playerReady) player.setVolume(store.volume);
   $('#vol').value = store.volume; fillRange($('#vol')); save();
+  const quickVolume = $('#quick [data-quick-volume]'), quickVolumeLabel = $('#q-volume-label');
+  if (quickVolume) quickVolume.value = store.volume;
+  if (quickVolumeLabel) quickVolumeLabel.textContent = `${store.volume}%`;
   if (mode === 'music') $('#b-mute').innerHTML = ic(store.volume === 0 ? 'volume-off' : store.volume < 50 ? 'volume-down' : 'volume');
 }
 
@@ -2461,7 +2484,7 @@ async function search(q, { backup = true, link = true } = {}) {
 }
 
 // ---------- 화면 전환 ----------
-let mode = 'doc', quickOpen = false, quickLyricsOpen = false, route = { name: 'home' }, lastRoute = { name: 'home' }, docFocus = null;
+let mode = 'doc', quickOpen = false, quickLyricsOpen = false, quickVideoOpen = false, quickSettingsOpen = false, route = { name: 'home' }, lastRoute = { name: 'home' }, docFocus = null;
 function setMode(m) {
   mode = m;
   $('#music').hidden = m !== 'music';
@@ -2516,7 +2539,7 @@ function quickPointer(e, onMove) {
   st.right = st.bottom = 'auto'; st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px';
   // 포인터를 붙잡아 둔다: 창 밖이나 YouTube 영상(iframe) 위에서 놓아도 끝을 알 수 있게. 브라우저가 취소해도 끝
   try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
-  const move = ev => onMove(ev.clientX - sx, ev.clientY - sy, r);
+  const move = ev => { onMove(ev.clientX - sx, ev.clientY - sy, r); placePlayer(); };
   const end = () => {
     removeEventListener('pointermove', move); removeEventListener('pointerup', end); removeEventListener('pointercancel', end);
     saveQuickBox();
@@ -2546,6 +2569,7 @@ $('#quick .q-head').addEventListener('dblclick', e => {
   delete store.settings.quickBox; save(); placeQuick();
 });
 addEventListener('resize', () => { if (quickOpen) placeQuick(); });
+quickEl.addEventListener('scroll', placePlayer, { passive: true });
 function toggleQuick(force) {
   quickOpen = force ?? !quickOpen;
   $('#quick').hidden = !quickOpen;
@@ -2554,19 +2578,36 @@ function toggleQuick(force) {
     placeQuick();
     renderQuickNow();
     if (quickLyricsOpen) renderQuickLyrics();
-    else setTimeout(() => $('#q-input').focus(), 0);
+    if (quickVideoOpen) renderQuickVideo();
+    if (quickSettingsOpen) renderQuickSettings();
+    if (!quickLyricsOpen && !quickVideoOpen && !quickSettingsOpen) setTimeout(() => $('#q-input').focus(), 0);
   }
+  placePlayer();
+}
+function setQuickView(view) {
+  if (!['search', 'lyrics', 'video', 'settings'].includes(view)) view = 'search';
+  quickLyricsOpen = view === 'lyrics';
+  quickVideoOpen = view === 'video';
+  quickSettingsOpen = view === 'settings';
+  $('#q-input').hidden = view !== 'search';
+  $('#q-results').hidden = view !== 'search';
+  $('#q-lyrics').hidden = view !== 'lyrics';
+  $('#q-video').hidden = view !== 'video';
+  $('#q-settings').hidden = view !== 'settings';
+  $('#quick').classList.toggle('quick-video', quickVideoOpen);
+  document.querySelectorAll('#quick [data-act="quickview"]').forEach(b => {
+    const active = b.dataset.view === view;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
+  if (quickLyricsOpen) renderQuickLyrics();
+  if (quickVideoOpen) renderQuickVideo();
+  if (quickSettingsOpen) renderQuickSettings();
+  if (view === 'search' && quickOpen) setTimeout(() => $('#q-input').focus(), 0);
+  placePlayer();
 }
 function toggleQuickLyrics(force) {
-  quickLyricsOpen = force ?? !quickLyricsOpen;
-  $('#q-input').hidden = quickLyricsOpen;
-  $('#q-results').hidden = quickLyricsOpen;
-  $('#q-lyrics').hidden = !quickLyricsOpen;
-  const button = $('#q-lyrics-toggle');
-  button.textContent = quickLyricsOpen ? '검색' : '가사';
-  button.title = quickLyricsOpen ? '빠른 검색으로 돌아가기' : '빠른 가사 보기';
-  if (quickLyricsOpen) renderQuickLyrics();
-  else if (quickOpen) setTimeout(() => $('#q-input').focus(), 0);
+  setQuickView((force ?? !quickLyricsOpen) ? 'lyrics' : 'search');
 }
 // 뒤로·앞으로 (브라우저 방문 기록은 안 건드린다: 문서처럼 보여야 하니까)
 const hist = { list: [{ name: 'home' }], i: 0 };
@@ -2611,6 +2652,7 @@ function panic() {
 const videoOpen = () => route.name === 'video' || (route.name === 'lyrics' && route.tab === 'video');
 // 영상 자리: 영상 화면이 열려 있으면 거기, 아니면 지금 재생 중 패널의 표지 자리
 function playerSlot() {
+  if (quickOpen && quickVideoOpen && current()) return $('#q-video-slot');
   if (mode !== 'music') return null;
   if (videoOpen()) return $('#video-slot');
   const s = store.panel === 'now' ? $('#np-video') : null;
@@ -2620,7 +2662,8 @@ function placePlayer() {
   const wrap = $('#yt-wrap'), slot = playerSlot();
   if (slot) {
     const inPanel = slot.id === 'np-video';
-    const r = slot.getBoundingClientRect(), m = (inPanel ? slot.closest('.rp-body') : $('#main')).getBoundingClientRect();
+    const inQuick = slot.id === 'q-video-slot';
+    const r = slot.getBoundingClientRect(), m = (inPanel ? slot.closest('.rp-body') : inQuick ? $('#quick') : $('#main')).getBoundingClientRect();
     const top = Math.max(r.top, m.top), bottom = Math.min(r.bottom, m.bottom);
     wrap.className = inPanel ? 'show panel' : 'show';
     Object.assign(wrap.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', clipPath: `inset(${top - r.top}px 0 ${r.bottom - bottom}px 0)` });
@@ -3590,6 +3633,7 @@ function markPlaying() {
 function renderTrackChange() {
   renderQuickNow();
   if (quickLyricsOpen) renderQuickLyrics();
+  if (quickVideoOpen) { renderQuickVideo(); placePlayer(); }
   renderMini();
   if (mode !== 'music') return;
   renderLib(); renderQueue(); renderNow(); markPlaying();
@@ -3605,6 +3649,8 @@ function renderQuickNow() {
 function renderAll() {
   renderQuickNow();
   if (quickLyricsOpen) renderQuickLyrics();
+  if (quickVideoOpen) { renderQuickVideo(); placePlayer(); }
+  if (quickSettingsOpen) renderQuickSettings();
   if (mode !== 'music') return;
   renderLibHead(); renderLib(); renderMain(); renderQueue(); renderNow();
 }
@@ -4320,7 +4366,10 @@ document.addEventListener('click', e => {
       break;
     case 'video': go(route.name === 'video' ? lastRoute : { name: 'video' }); break;
     case 'quickclose': toggleQuick(false); break;
+    case 'quickview': setQuickView(el.dataset.view); break;
     case 'quicklyrics': toggleQuickLyrics(); break;
+    case 'quickshuffle': cycleShuffle(); if (quickSettingsOpen) renderQuickSettings(); break;
+    case 'quickfullsettings': toggleQuick(false); setMode('music'); go({ name: 'settings' }); break;
     case 'export': {
       const blob = new Blob([JSON.stringify({ liked: store.liked, playlists: store.playlists, folders: store.folders, following: store.following, pins: store.pins, disliked: store.disliked, video: { liked: store.video.liked, disliked: store.video.disliked } }, null, 2)], { type: 'application/json' });
       const u = URL.createObjectURL(blob), link = document.createElement('a');
@@ -4652,6 +4701,11 @@ document.addEventListener('submit', async e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.matches('[data-quick-volume]')) {
+    setVolume(+t.value);
+    const label = $('#q-volume-label');
+    if (label) label.textContent = `${store.volume}%`;
+  }
   if (t.matches('[data-libq]')) { store.lib.q = t.value; renderLib(); }
   if (t.closest('[data-form="plfind"]')) finderOf(t.closest('form').dataset.id).q = t.value;
   if (t.dataset.listq !== undefined) {
@@ -4665,6 +4719,23 @@ $('#seek').addEventListener('input', e => fillRange(e.target));
 
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.matches('[data-quick-repeat]')) {
+    if (!['off', 'all', 'one'].includes(t.value)) return;
+    store.repeat = t.value; save(); autoSettingChanged(); renderNow();
+    return;
+  }
+  if (t.matches('[data-quick-speed]')) { setSpeed(+t.value); return; }
+  if (t.matches('[data-quick-lyrics-style]')) {
+    store.settings.lyricsStyle = t.value; save();
+    if (quickLyricsOpen) renderQuickLyrics();
+    toast('가사 모양을 저장했어요');
+    return;
+  }
+  if (t.matches('[data-quick-autoplay]')) {
+    store.settings.autoplay = t.checked; save(); autoSettingChanged();
+    toast(t.checked ? '자동 추천을 켰어요' : '자동 추천을 껐어요');
+    return;
+  }
   if (t.matches('[data-plcover]') && t.files[0]) {
     shrinkCover(t.files[0]).then(u => {
       pendingCover = u;
@@ -4909,6 +4980,24 @@ function tickQuickLyrics() {
   quickLyr.at = i;
   ps.forEach((x, k) => { x.classList.toggle('on', k === i); x.classList.toggle('past', k < i); });
   if (p) p.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
+}
+function renderQuickVideo() {
+  const el = $('#q-video'), t = current();
+  if (!t) { el.innerHTML = '<div id="q-video-empty">재생 중인 곡이 없어요</div>'; return; }
+  const m = meta(t);
+  el.innerHTML = `<div id="q-video-meta">${esc(m.title)} · ${esc(artistText(t))}</div><div id="q-video-slot"></div>`;
+}
+function renderQuickSettings() {
+  const el = $('#q-settings'), speed = store.settings.speed || 1;
+  const repeat = { off: '끔', all: '전체', one: '한 곡' };
+  const style = lyricStyle();
+  el.innerHTML = `<label class="q-setting"><span>볼륨 <b id="q-volume-label">${store.volume}%</b></span><input type="range" data-quick-volume min="0" max="100" value="${store.volume}" aria-label="볼륨"></label>
+    <button class="q-setting-button" data-act="quickshuffle"><span>셔플</span><b>${!store.shuffle ? '끔' : store.smart ? '스마트' : '켬'}</b></button>
+    <label class="q-setting"><span>반복</span><select data-quick-repeat>${Object.entries(repeat).map(([v, label]) => `<option value="${v}" ${store.repeat === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    <label class="q-setting"><span>재생 속도</span><select data-quick-speed>${[0.75, 1, 1.25, 1.5, 2].map(v => `<option value="${v}" ${speed === v ? 'selected' : ''}>${v}배</option>`).join('')}</select></label>
+    <label class="q-setting"><span>자동 추천</span><input type="checkbox" data-quick-autoplay ${autoplayOn() ? 'checked' : ''} aria-label="자동 추천"></label>
+    <label class="q-setting"><span>가사 모양</span><select data-quick-lyrics-style>${[['doc', 'Google 문서처럼'], ['spotify', 'Spotify처럼 산뜻하게'], ['clean', '깔끔하게']].map(([v, label]) => `<option value="${v}" ${style === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    <button class="q-settings-all" data-act="quickfullsettings">모든 설정 열기</button>`;
 }
 
 // 다른 가사 고르기. 창을 연 곡에 적용한다 (창이 열린 사이에 다음 곡으로 넘어갈 수 있다)
