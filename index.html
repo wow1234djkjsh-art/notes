@@ -795,6 +795,7 @@
   .m-edit .cov-edit .mi { width: 16px; height: 16px; }
   .m-edit .cov:hover .cov-edit { opacity: 1; }
   .m-dlg .m-note { margin: 12px 0 0; color: #fff; font-size: 11px; font-weight: 700; }
+  .m-share-url { display: block; width: 100%; min-height: 104px; resize: vertical; overflow-wrap: anywhere; background: rgba(255,255,255,.1); border: 1px solid #535353; border-radius: 6px; color: #fff; padding: 10px; font: 12px/1.5 monospace; }
   .m-edit input[type=text], .m-edit textarea { width: 100%; box-sizing: border-box; background: rgba(255,255,255,.1); border: 1px solid transparent; border-radius: 4px; color: #fff; padding: 10px 12px; font-family: inherit; font-size: 14px; outline: 0; }
   .m-edit input[type=text]:focus, .m-edit textarea:focus { border-color: #535353; background: #333; }
   .m-edit input[type=text] { height: 40px; }
@@ -1328,6 +1329,7 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 23일', [
+    '플레이리스트마다 공유 링크를 만들고, 링크를 받은 사람이 로그인 후 자기 보관함에 복사할 수 있음',
     'Ctrl+J 빠른 패널에서 재생 중인 영상과 자주 쓰는 재생 설정을 바로 열 수 있음',
     'Ctrl+J 빠른 패널에서 재생 중인 곡 가사를 바로 볼 수 있고, 설정에서 Google 문서풍·Spotify풍·깔끔한 모양을 고를 수 있음',
     '처음 쓰는 기기는 이름을 적고 승인을 받아야 들어올 수 있음',
@@ -2981,7 +2983,7 @@ function renderPlaylist(el, r) {
   el.innerHTML = stickBar(p.name, key) + `
     <div class="hero"><button class="art" data-act="pledit" data-id="${p.id}" title="세부 정보 수정">${plArt(p, 'art')}</button>
       <div class="hero-t"><div class="hero-type">플레이리스트</div><h1 class="edit" data-act="pledit" data-id="${p.id}">${esc(p.name)}</h1>${p.desc ? `<div class="hero-desc">${esc(p.desc)}</div>` : ''}<div class="hero-sub"><b>${esc(myName())}</b> • ${p.tracks.length}곡${total ? `, ${longTime(total)}` : ''}</div></div></div>
-    <div class="below">${actBar(key, { more: 'plmore', id: p.id })}<div class="pl-tools"><button class="pill" data-act="plfindopen" data-id="${p.id}">${ic('add')}추가</button><button class="pill" data-act="pledit" data-id="${p.id}">${ic('edit')}이름 및 세부 정보</button></div>${trackTable(key, p.tracks, { date: true, empty: '아래에서 곡을 찾아 넣어 보세요' })}</div>${finderHtml(p)}`;
+    <div class="below">${actBar(key, { more: 'plmore', id: p.id })}<div class="pl-tools"><button class="pill" data-act="plfindopen" data-id="${p.id}">${ic('add')}추가</button><button class="pill" data-act="pledit" data-id="${p.id}">${ic('edit')}이름 및 세부 정보</button><button class="pill" data-act="plshare" data-id="${p.id}">${ic('link')}공유</button></div>${trackTable(key, p.tracks, { date: true, empty: '아래에서 곡을 찾아 넣어 보세요' })}</div>${finderHtml(p)}`;
   setHero(p.tracks[0]?.id, p.name);
 }
 function renderFolder(el, r) {
@@ -3352,7 +3354,7 @@ function renderSettings(el) {
   el.innerHTML = `<div class="pad"><h1>설정</h1><div class="set">
     <h2>내 라이브러리</h2>
     ${setRow('간략한 레이아웃', '라이브러리를 사진 없이 작게 보여 줘요', `<input type="checkbox" data-libcompact ${store.lib.view === 'compact' ? 'checked' : ''}>`)}
-    <p class="m-hint">좋아요·플레이리스트는 이 브라우저에만 저장돼요. 다른 PC로 옮길 때 파일로 내보내고 가져오세요.</p>
+    <p class="m-hint">보관함은 브라우저별로 저장돼요. 플레이리스트는 공유 링크로 보내고, 전체 보관함은 파일로 옮길 수 있어요.</p>
     <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label><button class="pill" data-act="go" data-route="disliked">싫어요 목록 보기 · 음악 ${store.disliked.length} · 영상 ${store.video.disliked.length}</button></div>
     <h2>디스플레이</h2>
     ${setRow('곡을 틀면 지금 재생 중 패널 열기', '', boolBox('nowOnPlay', store.settings.nowOnPlay !== false))}
@@ -3705,7 +3707,7 @@ function showDlMenu(btn, t = current()) {
 const pinItem = key => mi('e-pin', 'pin', store.pins.includes(key) ? '고정 해제' : '고정', `data-key="${esc(key)}"`);
 function showPlMenu(anchor, p) {
   menuThing = p;
-  $('#menu').innerHTML = `${mi('e-queue', 'queue', '대기열에 추가')}${mi('e-edit', 'edit', '세부 정보 수정')}${mi('e-dup', 'copy', '복제')}${mi('e-del', 'delete', '삭제')}<hr>
+  $('#menu').innerHTML = `${mi('plshare', 'link', '플레이리스트 공유')}${mi('e-queue', 'queue', '대기열에 추가')}${mi('e-edit', 'edit', '세부 정보 수정')}${mi('e-dup', 'copy', '복제')}${mi('e-del', 'delete', '삭제')}<hr>
     ${p.tracks.length ? mi('e-dlall', 'download', '곡 모두 MP3로 받기', 'data-fmt="mp3"') + mi('e-dlall', 'download', '곡 모두 MP4로 받기', 'data-fmt="mp4"') + '<hr>' : ''}
     ${pinItem('pl:' + p.id)}
     ${store.folders.filter(f => f.id !== p.folder).map(f => mi('e-move', 'folder', `${f.name}(으)로 옮기기`, `data-id="${f.id}"`)).join('')}
@@ -3774,12 +3776,13 @@ const modalEl = $('#m-modal');
 function openModal(html) { modalEl.innerHTML = `<div class="m-dlg">${html}</div>`; modalEl.hidden = false; }
 function closeModal() { modalEl.hidden = true; modalEl.innerHTML = ''; pendingCover = null; }
 let pendingCover = null;
+let pendingSharedPlaylist = null, pendingPlaylistShareUrl = '';
 function editPlaylist(p) {
   pendingCover = null;
   openModal(`<h3>세부 정보 수정<button data-act="modalclose" title="닫기">${ic('close')}</button></h3>
     <form data-form="pledit" data-id="${p.id}"><div class="m-edit"><label class="cov" title="사진 선택">${plArt(p, 'pic')}<span class="ovl">사진 선택</span><span class="cov-edit">${ic('edit')}</span><input type="file" accept="image/*" data-plcover hidden></label>
     <div><input type="text" name="name" maxlength="100" value="${esc(p.name)}" placeholder="이름 추가" autocomplete="off" spellcheck="false"><textarea name="desc" maxlength="300" placeholder="설명 추가 (선택 사항)" spellcheck="false">${esc(p.desc || '')}</textarea></div></div>
-    <div class="m-btns"><button type="submit" class="go">저장하기</button></div><p class="m-note">사진과 이름은 이 브라우저에만 저장돼요.</p></form>`);
+    <div class="m-btns"><button type="submit" class="go">저장하기</button></div><p class="m-note">사진은 이 브라우저에만 저장돼요.</p></form>`);
   setTimeout(() => modalEl.querySelector('[name="name"]')?.select(), 0);
 }
 function editFolder(f) {
@@ -4103,6 +4106,121 @@ function copyLink(t) {
   const url = 'https://youtu.be/' + t.id;
   (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => toast('링크를 복사했어요'), () => toast(url));
 }
+const PLAYLIST_SHARE_TRACKS_MAX = 500, PLAYLIST_SHARE_URL_MAX = 50000;
+function base64UrlEncode(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+function base64UrlDecode(token) {
+  if (!/^[\w-]+$/.test(token) || token.length > PLAYLIST_SHARE_URL_MAX) throw new Error('invalid token');
+  const base = token.replace(/-/g, '+').replace(/_/g, '/'), binary = atob(base + '='.repeat((4 - base.length % 4) % 4));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+}
+function playlistShareUrl(p) {
+  if (!p || !Array.isArray(p.tracks) || p.tracks.length > PLAYLIST_SHARE_TRACKS_MAX) throw new Error('곡이 500개를 넘으면 링크로 공유할 수 없어요');
+  const tracks = p.tracks.filter(t => t && /^[\w-]{11}$/.test(t.id)).map(t => [t.id, String(t.title || t.id).slice(0, 200), String(t.channel || '').slice(0, 120), String(t.duration || '').slice(0, 24), Math.max(0, Math.min(86400, Math.round(+t.seconds || 0)))]);
+  const payload = { v: 1, n: String(p.name || '공유 플레이리스트').slice(0, 100), d: String(p.desc || '').slice(0, 300), t: tracks };
+  const url = new URL(location.href);
+  url.hash = `smpl=${base64UrlEncode(JSON.stringify(payload))}`;
+  if (url.href.length > PLAYLIST_SHARE_URL_MAX) throw new Error('링크가 너무 길어요. 설정의 JSON 내보내기로 공유해 주세요');
+  return url.href;
+}
+function showPlaylistShareLink(p, url) {
+  pendingPlaylistShareUrl = url;
+  openModal(`<h3>플레이리스트 공유<button data-act="modalclose" title="닫기">${ic('close')}</button></h3>
+    <p>링크에 플레이리스트 이름·설명·곡 목록이 담겨요. 링크를 받은 사람은 로그인·기기 승인을 마친 뒤 자기 보관함에 추가할 수 있어요.</p>
+    <textarea id="pl-share-url" class="m-share-url" readonly aria-label="플레이리스트 공유 링크">${esc(url)}</textarea>
+    <div class="m-btns"><button class="no" data-act="modalclose">닫기</button><button class="go" data-act="plsharecopy">링크 복사</button></div>`);
+  setTimeout(() => { const field = $('#pl-share-url'); if (field) { field.focus(); field.select(); } }, 0);
+}
+function copyPlaylistShareUrl() {
+  const field = $('#pl-share-url'), url = pendingPlaylistShareUrl || field?.value;
+  if (!url) return;
+  const copied = () => { toast('공유 링크를 복사했어요'); closeModal(); pendingPlaylistShareUrl = ''; };
+  const fallback = () => {
+    if (field) { field.focus(); field.select(); try { if (document.execCommand('copy')) return copied(); } catch (e) {} }
+    toast('링크를 선택했어요. 복사해 주세요');
+  };
+  if (typeof navigator.clipboard?.writeText === 'function') navigator.clipboard.writeText(url).then(copied, fallback);
+  else fallback();
+}
+function sharePlaylist(p) {
+  if (!p) return;
+  let url;
+  try { url = playlistShareUrl(p); } catch (e) { toast(e.message || '공유 링크를 만들지 못했어요'); return; }
+  if (url.length > 8000) toast('링크가 길어요. 일부 메신저에서 전송이 제한될 수 있어요');
+  if (typeof navigator.share === 'function') {
+    try {
+      Promise.resolve(navigator.share({ title: p.name, text: `${p.name} · ${p.tracks.length}곡`, url }))
+        .then(() => toast('공유 메뉴를 열었어요'))
+        .catch(e => { if (e?.name !== 'AbortError') showPlaylistShareLink(p, url); });
+      return;
+    } catch (e) {}
+  }
+  showPlaylistShareLink(p, url);
+}
+function parseSharedPlaylist(token) {
+  const data = JSON.parse(base64UrlDecode(token));
+  if (!data || data.v !== 1 || typeof data.n !== 'string' || !Array.isArray(data.t) || data.t.length > PLAYLIST_SHARE_TRACKS_MAX) throw new Error('invalid playlist');
+  const seen = new Set(), tracks = [];
+  for (const row of data.t) {
+    if (!Array.isArray(row) || typeof row[0] !== 'string' || !/^[\w-]{11}$/.test(row[0]) || seen.has(row[0])) continue;
+    seen.add(row[0]);
+    const seconds = Math.max(0, Math.min(86400, Math.round(+row[4] || 0)));
+    tracks.push({ id: row[0], title: String(row[1] || row[0]).slice(0, 200), channel: String(row[2] || '').slice(0, 120), duration: String(row[3] || (seconds ? fmt(seconds) : '')).slice(0, 24), seconds });
+  }
+  if (data.t.length && !tracks.length) throw new Error('no valid tracks');
+  return { name: data.n.trim().slice(0, 100) || '공유 플레이리스트', desc: String(data.d || '').slice(0, 300), tracks };
+}
+function offerSharedPlaylist(data) {
+  pendingSharedPlaylist = data;
+  openModal(`<h3>플레이리스트 받기<button data-act="modalclose" title="닫기">${ic('close')}</button></h3>
+    <p><b>${esc(data.name)}</b> · ${data.tracks.length}곡</p>
+    ${data.desc ? `<p>${esc(data.desc)}</p>` : ''}
+    <p>이 플레이리스트를 내 보관함에 복사할까요? 원본 플레이리스트에는 영향이 없어요.</p>
+    <div class="m-btns"><button class="no" data-act="modalclose">취소</button><button class="go" data-act="plshareimport">내 보관함에 추가</button></div>`);
+}
+function consumeSharedPlaylistLink() {
+  const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+  let token = params.get('smpl');
+  try {
+    if (token) sessionStorage.setItem('sm.playlistSharePending', token);
+    else token = sessionStorage.getItem('sm.playlistSharePending');
+  } catch (e) {}
+  if (!token) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  try {
+    const data = parseSharedPlaylist(token);
+    try { sessionStorage.removeItem('sm.playlistSharePending'); } catch (e) {}
+    setTimeout(() => offerSharedPlaylist(data), 0);
+  } catch (e) {
+    try { sessionStorage.removeItem('sm.playlistSharePending'); } catch (err) {}
+    toast('플레이리스트 링크가 잘못되었거나 너무 커요');
+  }
+}
+function importSharedPlaylist() {
+  const data = pendingSharedPlaylist;
+  pendingSharedPlaylist = null;
+  closeModal();
+  if (!data) return;
+  if (!storeWritable) return toast('이 브라우저에서는 플레이리스트를 저장할 수 없어요');
+  const at = Date.now();
+  const p = { id: at.toString(36), name: data.name, desc: data.desc, at, tracks: data.tracks.map(t => ({ ...t, at })) };
+  while (plById(p.id)) p.id += 'x';
+  store.playlists.push(p);
+  if (JSON.stringify(store).length > STORE_MAX) {
+    store.playlists.pop();
+    return toast('저장 공간이 부족해 플레이리스트를 추가하지 못했어요');
+  }
+  save();
+  setMode('music');
+  go({ name: 'playlist', id: p.id });
+  toast('플레이리스트를 내 보관함에 추가했어요');
+}
 function canReorder(key) { const v = viewOf(key); return key.startsWith('pl:') && !v.by && !v.q; }
 function reorderPlaylist(p, idx, to) {
   const moved = idx.map(i => p.tracks[i]), rest = p.tracks.filter((_, i) => !idx.includes(i));
@@ -4193,6 +4311,9 @@ document.addEventListener('click', e => {
     case 'plfindopen': finderOpen.add(id); renderMain(); $('#main .finder input')?.focus(); $('#main .finder')?.scrollIntoView({ block: 'nearest' }); break;
     case 'plfindclose': finderOpen.delete(id); renderMain(); break;
     case 'plmore': showPlMenu(el, plById(id)); break;
+    case 'plshare': hideMenu(); sharePlaylist(plById(id)); break;
+    case 'plsharecopy': copyPlaylistShareUrl(); break;
+    case 'plshareimport': importSharedPlaylist(); break;
     case 'likedmore': $('#menu').innerHTML = mi('likedcopy', 'add', '플레이리스트로 만들기', `data-id="${id}"`); placeMenu(el); break;
     case 'likedcopy': {
       const p = newPlaylist(), d = new Date();
@@ -5374,6 +5495,7 @@ setInterval(checkMe, 60000);
 
 // 처음 온 사람에게만: 단축키 → 업데이트 내역. 띄우는 순간 봤음으로 저장해서 다시는 안 뜬다
 if (FIRST_VISIT && !store.settings.introSeen) { store.settings.introSeen = true; save(); showKeys(true); }
+consumeSharedPlaylistLink();
 </script>
 </body>
 </html>
