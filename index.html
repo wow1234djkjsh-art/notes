@@ -959,17 +959,19 @@
 
 <script>
 const CONFIG = {
-  // 검색·믹스: 러버블 서버를 거쳐 검색 서버(Google Apps Script)로 중계 (lovable/src/lib/search-proxy.ts)
+  // 검색·믹스: 러버블 서버가 로그인을 확인하고 검색 서버(Google Apps Script)로 중계 (lovable/src/lib/search-proxy.ts)
   searchUrl: '/api/search',
-  // 가사: 러버블 서버가 LRCLIB에서 찾아 온다 (lovable/src/lib/lyrics-proxy.ts)
+  // 가사: 러버블 서버가 로그인을 확인하고 LRCLIB에서 찾아 온다 (lovable/src/lib/lyrics-proxy.ts)
   lyricsUrl: '/api/lyrics',
   // 앨범, 표지, 가수 사진: 러버블 서버가 애플 음악 자료와 위키백과에서 가져온다 (lovable/src/lib/album-proxy.ts)
   albumUrl: '/api/album',
   invidious: 'https://yt.chocolatemoo53.com',
   // 이 컴퓨터에서 도는 다운로드 서버 (~/stealth-music/dl)
   dlUrl: 'http://localhost:8790',
-  // 친구 채팅: 러버블 서버를 거쳐 채팅 서버로 중계 (lovable/src/lib/chat-proxy.ts)
+  // 친구 채팅: 러버블 서버가 비밀번호를 확인하고 채팅 서버로 중계 (lovable/src/lib/chat-proxy.ts)
   chatUrl: '/api/chat',
+  // 기기 승인: 이 브라우저가 아직 승인돼 있나 (lovable/src/lib/device-gate.ts)
+  meUrl: '/api/me',
   panicUrl: 'https://docs.google.com/document/u/0/',
 };
 
@@ -1267,6 +1269,7 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 23일', [
+    '처음 쓰는 기기는 이름을 적고 승인을 받아야 들어올 수 있음',
     '영상 화면(영상 칸, 영상 검색, 좋아요한 영상)에서는 다음에 영상만, 노래를 들을 때는 노래만 이어서 나옴. 영상 화면에서 뮤직비디오를 틀면 노래가 이어짐',
     '영상 화면 셋에서 본 건 모두 영상 기록에 남음. 틀다가 문서 화면으로 숨겨도 틀기 시작한 쪽 기록에 남음',
     '자동으로 나온 곡을 30초 안에 넘기면 비슷한 곡이 덜 나오고, 그 곡을 바탕으로 골라 둔 추천도 빠짐',
@@ -1334,6 +1337,7 @@ const CHANGELOG = [
     '검색: "masterpiece"처럼 영어 11글자 한 단어도 제대로 검색됨, 빠르게 다시 검색해도 옛 결과가 안 섞임',
     '설정: 검색 서버가 안 될 때 쓰는 예비 검색을 끌 수 있음 (켜 두면 그때 검색어가 다른 서버로 감)',
     '셔플 중에 대기열에서 뺀 곡이 셔플을 끄면 다시 나타나던 문제 고침',
+    '보안: 비밀번호를 15분에 10번까지만 시도할 수 있음, 검색도 로그인한 사람만',
   ]],
   ['11월 2일', [
     '다운로드 탭: 음악 화면 왼쪽 "다운로드"에서 곡마다 대기 중 / 받는 중 / 변환 중(남은 시간) / 저장됨이 따로 보임. 실패하면 "다시" 버튼',
@@ -1349,8 +1353,10 @@ const CHANGELOG = [
     '음악 화면 아이콘 새로 바꿈, 싫어요는 엄지 아래 모양',
     '싫어요 목록은 설정 → 싫어요 목록 보기',
     '자동 추천: 내가 들은 기록을 더 많이 반영, 한 곡 반복으로 여러 번 들은 곡이 더 잘 나옴',
+    '로그인할 때 방문 기록에 로그인 화면이 남지 않음',
   ]],
   ['11월 1일', [
+    '비밀번호로 잠금 (한 번 로그인하면 30일 유지)',
     '영상/음악 기록 따로: 영상 화면을 켜고 본 건 영상 기록, 나머지는 음악 기록. 좋아요·추천도 따로',
     '곡 MP3/MP4로 받기 (더보기 메뉴, 재생 바, 빠른 패널) — 다운로드 서버가 있는 컴퓨터에서만 됨',
     '옛 주소(github.io)는 새 주소로 안내',
@@ -2293,6 +2299,7 @@ function takeAuto() {
 // 검색 서버 부르기 (러버블 /api/search): {action: 'search', q} | {action: 'mix', id} → {results} | {error}
 async function searchApi(body) {
   const r = await fetch(CONFIG.searchUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  if (r.status === 401) kicked();
   const j = await r.json().catch(() => ({}));
   if (!r.ok && !j.error) j.error = 'HTTP ' + r.status;
   return j;
@@ -2895,6 +2902,7 @@ const artistData = new Map();
 // 앨범 자료. YouTube에는 앨범이 없어서 러버블을 거쳐 애플 음악 자료에서 찾는다
 async function albumApi(body) {
   const r = await fetch(CONFIG.albumUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+  if (r.status === 401) kicked();
   if (!r.ok) throw new Error('album ' + r.status);
   return r.json();
 }
@@ -4699,7 +4707,7 @@ function setSleep(v) {
 // ---------- 가사 (러버블 /api/lyrics가 LRCLIB에서 찾아 준다) ----------
 const lyricsCache = new Map();
 const lyricsPost = body => fetch(CONFIG.lyricsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) })
-  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)));
+  .then(r => { if (r.status === 401) kicked(); return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); });
 // 직접 고른 가사가 있으면 그 기록을, 없으면 자동으로 찾은 기록을 쓴다. 고르면 키가 바뀌어서 화면이 새로 불러온다
 const lyricKey = t => t.id + '\n' + t.title + '\n' + (store.lyricPick[t.id]?.id || '');
 function fetchLyrics(t) {
@@ -5049,6 +5057,7 @@ function syncAlong() {
 const setChatNote = t => { $('#d-chat .dc-note').textContent = t; };
 async function chatRequest(body) {
   const r = await fetch(setting('chatUrl'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ name: chatName(), since: chat.since, np: nowInfo(), ...body }) });
+  if (r.status === 401) kicked();
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.error) throw new Error(j.error || r.status);
   return j;
@@ -5127,6 +5136,42 @@ $('#d-chat textarea').addEventListener('keydown', e => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) chatPoll(); });
 chatPoll();
+
+// ---------- 기기 승인 (러버블 /api/me) ----------
+// 1분마다 이 브라우저가 아직 승인돼 있나 본다. 탭이 안 보여도 본다: 내보낸 기기가 1분 안에 나가게.
+// 401(내보냄·승인 취소·로그인 끝남)이면 재생을 멈추고 새로 연다 → 러버블이 대기 화면이나 로그인 화면을 보여 준다.
+// 다른 탭이 이어받아 멈춘 탭은 묻지 않는다 (같은 브라우저라 이어받은 탭이 본다)
+// 새로 연 지 10분 안에 또 401이 오면 다시 새로 열지 않는다. 새로 열었는데 이 화면이 또 떴다면 화면을 보낸 서버는 들여보낸 것이고,
+// 401은 다른 판이 답한 것이다(러버블이 옛 판과 새 판을 섞어 답할 때). 그대로 두면 새로 열기가 되풀이되며 재생이 계속 멈춘다.
+// 진짜로 내보낸 기기는 새로 열면 대기 화면이 떠서 이 코드가 다시 돌지 않는다. 알림은 화면마다 한 번만
+const KICK_KEY = 'sm.kickAt', KICK_QUIET_MS = 600000;
+let kickedOnce = false, kickTold = false;
+function kicked() {
+  if (kickedOnce) return;
+  let last = 0;
+  try { last = Number(sessionStorage.getItem(KICK_KEY)) || 0; } catch (e) {}
+  if (Date.now() - last < KICK_QUIET_MS) {
+    if (!kickTold) { kickTold = true; toast('연결이 고르지 않아요. 잠시 뒤에 새로고침해 주세요'); }
+    return;
+  }
+  kickedOnce = true;
+  try { sessionStorage.setItem(KICK_KEY, String(Date.now())); } catch (e) {}
+  pause();
+  location.reload();
+}
+async function checkMe() {
+  if (!tabActive || kickedOnce) return;
+  try {
+    const r = await fetch(CONFIG.meUrl, { credentials: 'same-origin', cache: 'no-store' });
+    if (r.status === 401) return kicked();
+    if (r.status !== 200) return; // 204 = 검색 서버가 안 됨, 그 밖 = 기능이 없음 → 그대로 둔다
+    const name = String((await r.json()).name || '').trim().slice(0, 20);
+    // 채팅 이름이 비어 있으면 승인할 때 적은 이름을 넣는다 (설정에서 바꿀 수 있다)
+    if (name && !chatName()) { store.settings.chatName = name; save(); renderFriends(); renderLib(); chatPoll(); }
+  } catch (e) {}
+}
+checkMe();
+setInterval(checkMe, 60000);
 
 // 처음 온 사람에게만: 단축키 → 업데이트 내역. 띄우는 순간 봤음으로 저장해서 다시는 안 뜬다
 if (FIRST_VISIT && !store.settings.introSeen) { store.settings.introSeen = true; save(); showKeys(true); }
