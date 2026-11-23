@@ -663,6 +663,20 @@
   .lyr-sync { position: sticky; top: 76px; float: left; background: #fff; color: #000; height: 32px; padding: 0 16px; border-radius: 16px; font-size: 14px; font-weight: 700; letter-spacing: 0; z-index: 2; }
   .lyr p.on { color: #fff; }
   .lyr.plain p { color: #fff; cursor: text; }
+  .lyr.theme-doc { max-width: 816px; margin: 0 auto; padding: 64px clamp(28px, 8vw, 96px); background: #fff; color: #202124; box-shadow: 0 1px 3px rgba(60,64,67,.2); font: 22px/1.65 Arial, "Malgun Gothic", sans-serif; letter-spacing: 0; }
+  .lyr.theme-doc p, .lyr.theme-doc.plain p { color: #3c4043; }
+  .lyr.theme-doc p.past { color: #9aa0a6; }
+  .lyr.theme-doc p.on { color: #1a73e8; }
+  .lyr.theme-doc p:hover { color: #174ea6; }
+  .lyr.theme-doc .lyr-why, .lyr.theme-doc .lyr-note { color: #5f6368; }
+  .lyr.theme-spotify { background: radial-gradient(ellipse at 75% 0, #24553b 0, #202820 35%, #121212 78%); }
+  .lyr.theme-spotify p { color: rgba(255,255,255,.72); }
+  .lyr.theme-spotify p.past { color: rgba(255,255,255,.38); }
+  .lyr.theme-spotify p.on { color: #1ed760; }
+  .lyr.theme-clean { background: #111; }
+  .lyr.theme-clean p { color: rgba(255,255,255,.68); }
+  .lyr.theme-clean p.past { color: rgba(255,255,255,.34); }
+  .lyr.theme-clean p.on { color: #fff; }
   .lyr-shift { position: sticky; top: 72px; float: right; display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,.45); border-radius: 16px; padding: 2px 4px; font-size: 13px; font-weight: 400; letter-spacing: 0; z-index: 2; }
   .lyr-shift span { padding: 0 6px; color: #fff; min-width: 56px; text-align: center; }
   .lyr-shift button { color: #fff; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 13px; }
@@ -796,6 +810,9 @@
   #quick { position: fixed; right: 20px; bottom: 20px; width: 340px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid #dadce0; border-radius: 12px; box-shadow: 0 6px 24px rgba(60,64,67,.25); padding: 12px; z-index: 40; font-size: 13px; color: #3c4043; }
   #quick { display: flex; flex-direction: column; }
   #quick .q-head { display: flex; justify-content: space-between; color: #5f6368; margin-bottom: 6px; cursor: move; user-select: none; touch-action: none; }
+  #quick .q-actions { display: flex; align-items: center; gap: 4px; }
+  #quick .q-actions button { padding: 3px 8px; border-radius: 6px; color: #5f6368; }
+  #quick .q-actions button:hover { background: #e8eaed; }
   #quick .q-resize { position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; cursor: nwse-resize; touch-action: none; border-right: 2px solid #c4c7c5; border-bottom: 2px solid #c4c7c5; border-radius: 0 0 8px 0; }
   #quick.sized ul { max-height: none; flex: 1 1 auto; min-height: 0; }
   #quick input[type=text] { width: 100%; border: 1px solid #dadce0; border-radius: 6px; padding: 8px 10px; outline: none; }
@@ -813,6 +830,28 @@
   #quick .q-ctl button { flex: 1; background: #f1f3f4; border-radius: 6px; padding: 5px 0; font-size: 12px; color: #3c4043; }
   #quick .q-ctl button:hover { background: #e8eaed; }
   #quick .q-ctl button.on { background: #d2e3fc; }
+  #quick #q-lyrics[hidden] { display: none; }
+  #quick #q-lyrics:not([hidden]) { display: flex; flex: 1 1 220px; min-height: 120px; max-height: 340px; overflow: auto; margin-top: 8px; border-radius: 8px; }
+  #quick.sized #q-lyrics:not([hidden]) { max-height: none; min-height: 0; }
+  #q-lyrics .q-lyr { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding: 12px; overflow: hidden; border-radius: 8px; background: #171717; color: #fff; font-size: 14px; line-height: 1.5; }
+  #q-lyrics .q-lyr-meta { flex: none; padding: 0 2px 8px; border-bottom: 1px solid rgba(255,255,255,.14); }
+  #q-lyrics .q-lyr-meta b, #q-lyrics .q-lyr-meta span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #q-lyrics .q-lyr-meta span { margin-top: 2px; opacity: .68; }
+  #q-lyrics .q-lyr-lines { flex: 1; min-height: 0; overflow: auto; padding: 8px 2px 14px; }
+  #q-lyrics .q-lyr p { margin: .55em 0; color: rgba(255,255,255,.68); cursor: text; transition: color .18s; }
+  #q-lyrics .q-lyr p[data-act] { cursor: pointer; }
+  #q-lyrics .q-lyr p.past { color: rgba(255,255,255,.34); }
+  #q-lyrics .q-lyr p.on { color: #fff; font-weight: 700; }
+  #q-lyrics .q-lyr .q-lyr-note { margin-top: 12px; opacity: .62; font-size: 11px; }
+  #q-lyrics .q-lyr.theme-doc { background: #fff; color: #202124; font-family: Arial, "Malgun Gothic", sans-serif; }
+  #q-lyrics .q-lyr.theme-doc .q-lyr-meta { border-color: #dadce0; }
+  #q-lyrics .q-lyr.theme-doc .q-lyr-meta span { color: #5f6368; opacity: 1; }
+  #q-lyrics .q-lyr.theme-doc p { color: #3c4043; }
+  #q-lyrics .q-lyr.theme-doc p.past { color: #9aa0a6; }
+  #q-lyrics .q-lyr.theme-doc p.on { color: #1a73e8; }
+  #q-lyrics .q-lyr.theme-spotify { background: radial-gradient(ellipse at 75% 0, #24553b 0, #202820 35%, #121212 78%); }
+  #q-lyrics .q-lyr.theme-spotify p.on { color: #1ed760; }
+  #q-lyrics .q-lyr.theme-clean { background: #111; }
 
   /* ---------- 플레이어 / 기타 ---------- */
   #yt-wrap { position: fixed; z-index: 30; }
@@ -926,9 +965,10 @@
 <!-- 빠른 패널 (Ctrl+J) -->
 <div id="quick" hidden>
   <div class="q-resize" title="크기 조절"></div>
-  <div class="q-head" title="끌어서 옮기기 · 두 번 누르면 원래 자리로"><span>메모</span><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div>
+  <div class="q-head" title="끌어서 옮기기 · 두 번 누르면 원래 자리로"><span>메모</span><div class="q-actions"><button data-act="quicklyrics" id="q-lyrics-toggle" title="빠른 가사 보기">가사</button><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div></div>
   <input type="text" id="q-input" autocomplete="off" spellcheck="false">
   <ul id="q-results"></ul>
+  <div id="q-lyrics" hidden></div>
   <div class="q-now" id="q-now" hidden>
     <div class="q-title" id="q-title"></div>
     <div class="q-seek"><span id="q-cur">0:00</span><input type="range" id="q-seek" min="0" max="1000" value="0"><span id="q-dur">0:00</span></div>
@@ -1247,7 +1287,7 @@ const SHORTCUTS = [
     ['Alt+L', '좋아요'],
     ['Alt+X', '싫어요 (바로 다음 곡으로)'],
     ['Alt+M', '음악 화면과 문서 화면 전환'],
-    ['Ctrl+J', '빠른 패널 열기 / 닫기'],
+    ['Ctrl+J', '빠른 패널 열기 / 닫기 (안에서 가사 보기)'],
     ['Ctrl+X 또는 Alt+K', '긴급 탈출 (진짜 Google 문서로 이동)'],
     ['Ctrl+/', '이 단축키 목록'],
     ['Esc', '메뉴·패널 닫기, 음악 화면에서는 문서로'],
@@ -1269,6 +1309,7 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 23일', [
+    'Ctrl+J 빠른 패널에서 재생 중인 곡 가사를 바로 볼 수 있고, 설정에서 Google 문서풍·Spotify풍·깔끔한 모양을 고를 수 있음',
     '처음 쓰는 기기는 이름을 적고 승인을 받아야 들어올 수 있음',
     '영상 화면(영상 칸, 영상 검색, 좋아요한 영상)에서는 다음에 영상만, 노래를 들을 때는 노래만 이어서 나옴. 영상 화면에서 뮤직비디오를 틀면 노래가 이어짐',
     '영상 화면 셋에서 본 건 모두 영상 기록에 남음. 틀다가 문서 화면으로 숨겨도 틀기 시작한 쪽 기록에 남음',
@@ -2420,7 +2461,7 @@ async function search(q, { backup = true, link = true } = {}) {
 }
 
 // ---------- 화면 전환 ----------
-let mode = 'doc', quickOpen = false, route = { name: 'home' }, lastRoute = { name: 'home' }, docFocus = null;
+let mode = 'doc', quickOpen = false, quickLyricsOpen = false, route = { name: 'home' }, lastRoute = { name: 'home' }, docFocus = null;
 function setMode(m) {
   mode = m;
   $('#music').hidden = m !== 'music';
@@ -2512,8 +2553,20 @@ function toggleQuick(force) {
     if (mode === 'music') setMode('doc');
     placeQuick();
     renderQuickNow();
-    setTimeout(() => $('#q-input').focus(), 0);
+    if (quickLyricsOpen) renderQuickLyrics();
+    else setTimeout(() => $('#q-input').focus(), 0);
   }
+}
+function toggleQuickLyrics(force) {
+  quickLyricsOpen = force ?? !quickLyricsOpen;
+  $('#q-input').hidden = quickLyricsOpen;
+  $('#q-results').hidden = quickLyricsOpen;
+  $('#q-lyrics').hidden = !quickLyricsOpen;
+  const button = $('#q-lyrics-toggle');
+  button.textContent = quickLyricsOpen ? '검색' : '가사';
+  button.title = quickLyricsOpen ? '빠른 검색으로 돌아가기' : '빠른 가사 보기';
+  if (quickLyricsOpen) renderQuickLyrics();
+  else if (quickOpen) setTimeout(() => $('#q-input').focus(), 0);
 }
 // 뒤로·앞으로 (브라우저 방문 기록은 안 건드린다: 문서처럼 보여야 하니까)
 const hist = { list: [{ name: 'home' }], i: 0 };
@@ -3260,6 +3313,7 @@ function renderSettings(el) {
     <div class="actions"><button class="pill" data-act="export">내보내기 (.json)</button><label class="pill" style="cursor:pointer">가져오기<input type="file" id="import" accept=".json,application/json" hidden></label><button class="pill" data-act="go" data-route="disliked">싫어요 목록 보기 · 음악 ${store.disliked.length} · 영상 ${store.video.disliked.length}</button></div>
     <h2>디스플레이</h2>
     ${setRow('곡을 틀면 지금 재생 중 패널 열기', '', boolBox('nowOnPlay', store.settings.nowOnPlay !== false))}
+    ${setRow('가사 모양', '빠른 가사와 큰 가사 화면에 적용돼요', `<select data-lyrics-style>${[['doc', 'Google 문서처럼'], ['spotify', 'Spotify처럼 산뜻하게'], ['clean', '깔끔하게']].map(([v, label]) => `<option value="${v}" ${((store.settings.lyricsStyle || 'clean') === v) ? 'selected' : ''}>${label}</option>`).join('')}</select>`)}
     <h2>재생하기</h2>
     ${setRow('자동 추천', '곡이 끝나면 어울리는 곡을 이어서 재생', boolBox('autoplay', autoplayOn()))}
     ${setRow('재생 속도', '', `<select data-speed>${[0.75, 1, 1.25, 1.5, 2].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}배</option>`).join('')}</select>`)}
@@ -3535,6 +3589,7 @@ function markPlaying() {
 }
 function renderTrackChange() {
   renderQuickNow();
+  if (quickLyricsOpen) renderQuickLyrics();
   renderMini();
   if (mode !== 'music') return;
   renderLib(); renderQueue(); renderNow(); markPlaying();
@@ -3549,6 +3604,7 @@ function renderQuickNow() {
 }
 function renderAll() {
   renderQuickNow();
+  if (quickLyricsOpen) renderQuickLyrics();
   if (mode !== 'music') return;
   renderLibHead(); renderLib(); renderMain(); renderQueue(); renderNow();
 }
@@ -4197,7 +4253,7 @@ document.addEventListener('click', e => {
     case 'lyrics': toggleLyrics(); break;
     case 'bigtab': go({ name: 'lyrics', tab: el.dataset.id }); break;
     case 'bigclose': go(lastRoute); break;
-    case 'lyricline': if (playerReady && current()) { player.seekTo(Math.max(0, +el.dataset.t - shiftOf(current().id)), true); if (!playing) player.playVideo(); tickLyrics(); tickNpLyrics(); } break;
+    case 'lyricline': if (playerReady && current()) { player.seekTo(Math.max(0, +el.dataset.t - shiftOf(current().id)), true); if (!playing) player.playVideo(); tickLyrics(); tickNpLyrics(); tickQuickLyrics(); } break;
     case 'nplyr': toggleNpLyrics(); break;
     case 'lyrfull': openFs(true, 'lyrics'); break;
     case 'lyricshift': nudgeLyrics(+id); break;
@@ -4264,6 +4320,7 @@ document.addEventListener('click', e => {
       break;
     case 'video': go(route.name === 'video' ? lastRoute : { name: 'video' }); break;
     case 'quickclose': toggleQuick(false); break;
+    case 'quicklyrics': toggleQuickLyrics(); break;
     case 'export': {
       const blob = new Blob([JSON.stringify({ liked: store.liked, playlists: store.playlists, folders: store.folders, following: store.following, pins: store.pins, disliked: store.disliked, video: { liked: store.video.liked, disliked: store.video.disliked } }, null, 2)], { type: 'application/json' });
       const u = URL.createObjectURL(blob), link = document.createElement('a');
@@ -4618,6 +4675,12 @@ document.addEventListener('change', e => {
     return;
   }
   if (t.matches('[data-speed]')) { setSpeed(+t.value); return; }
+  if (t.matches('[data-lyrics-style]')) {
+    store.settings.lyricsStyle = t.value; save();
+    if (quickLyricsOpen) renderQuickLyrics();
+    toast('가사 모양을 저장했어요');
+    return;
+  }
   if (t.matches('[data-libcompact]')) { store.lib.view = t.checked ? 'compact' : 'list'; save(); renderLibHead(); renderLib(); toast('저장했어요'); return; }
   if (t.dataset.setting) { store.settings[t.dataset.setting] = t.value.trim(); save(); toast('저장했어요'); }
   if (t.dataset.settingBool) {
@@ -4723,6 +4786,8 @@ function fetchLyrics(t) {
   return p;
 }
 const lyr = { key: null, id: null, data: null, at: -2, free: false };
+const quickLyr = { key: null, id: null, data: null, at: -2 };
+const lyricStyle = () => ['doc', 'spotify', 'clean'].includes(store.settings.lyricsStyle) ? store.settings.lyricsStyle : 'clean';
 // 패널의 가사 칸. 큰 화면으로 가지 않고 그 자리에서 늘어난다 (한 번 늘리면 다음 곡에도 그대로)
 const npl = { id: null, lines: null, at: -2 };
 const npLyrOpen = () => !!store.settings.npLyrics;
@@ -4778,7 +4843,7 @@ function renderLyrics(el) {
   setHero(t.id, t.title);
   const disco = bigArtist(t);
   if (bigTab() === 'photo' && !disco?.photo) route.tab = 'art';
-  const top = bigTop(t), tab = bigTab();
+  const top = bigTop(t), tab = bigTab(), theme = `theme-${lyricStyle()}`;
   if (tab === 'art') { el.innerHTML = `${top}<div class="big-page"><img class="big-cover" src="${thumbBig(t.id)}" data-big="${esc(t.id)}" alt="">${disco?.bio ? `<div class="big-more"><h2>아티스트 상세정보</h2>${bioCard(disco)}</div>` : ''}</div>`; return; }
   if (tab === 'video') { el.innerHTML = `${top}<div class="big-page big-vid"><div id="video-slot"></div></div>`; return; }
   if (tab === 'photo') { el.innerHTML = `${top}<div class="big-page big-photo${disco.wide ? '' : ' tall'}" style="background-image:url(${esc(cssUrl(disco.photo))})"></div>`; return; }
@@ -4789,18 +4854,62 @@ function renderLyrics(el) {
     fetchLyrics(t).then(d => { if (lyr.key === key) { lyr.data = d; if (route.name === 'lyrics' && bigTab() === 'lyrics') renderMain(); } });
   }
   const d = lyr.data;
-  if (!d || d.waiting) { el.innerHTML = `${top}<div class="lyr"><p class="past">가사를 찾는 중…</p></div>`; return; }
+  if (!d || d.waiting) { el.innerHTML = `${top}<div class="lyr ${theme}"><p class="past">가사를 찾는 중…</p></div>`; return; }
   if (d.lines.length) {
-    el.innerHTML = `${top}<div class="lyr">${lyr.free ? syncBtn : ''}<div class="lyr-shift" title="뮤직비디오는 앞에 영상이 붙어서 가사가 어긋날 수 있어요"><button data-act="lyricshift" data-id="-0.5">늦추기</button><span>${shiftText(t.id)}</span><button data-act="lyricshift" data-id="0.5">앞당기기</button>${otherBtn}</div>${d.lines.map(l => `<p data-act="lyricline" data-t="${l.t}">${esc(l.x) || '…'}</p>`).join('')}<div class="lyr-note">가사 제공: LRCLIB</div></div>`;
+    el.innerHTML = `${top}<div class="lyr ${theme}">${lyr.free ? syncBtn : ''}<div class="lyr-shift" title="뮤직비디오는 앞에 영상이 붙어서 가사가 어긋날 수 있어요"><button data-act="lyricshift" data-id="-0.5">늦추기</button><span>${shiftText(t.id)}</span><button data-act="lyricshift" data-id="0.5">앞당기기</button>${otherBtn}</div>${d.lines.map(l => `<p data-act="lyricline" data-t="${l.t}">${esc(l.x) || '…'}</p>`).join('')}<div class="lyr-note">가사 제공: LRCLIB</div></div>`;
     lyr.at = -2; tickLyrics();
   } else if (d.plain) {
-    el.innerHTML = `${top}<div class="lyr plain"><div class="lyr-shift">${otherBtn}</div><div class="lyr-why">${LYRIC_WHY[d.why]}</div>${d.plain.split('\n').map(x => `<p>${esc(x) || '&nbsp;'}</p>`).join('')}<div class="lyr-note">가사 제공: LRCLIB</div></div>`;
+    el.innerHTML = `${top}<div class="lyr plain ${theme}"><div class="lyr-shift">${otherBtn}</div><div class="lyr-why">${LYRIC_WHY[d.why]}</div>${d.plain.split('\n').map(x => `<p>${esc(x) || '&nbsp;'}</p>`).join('')}<div class="lyr-note">가사 제공: LRCLIB</div></div>`;
   } else {
-    el.innerHTML = `${top}<div class="lyr plain"><div class="lyr-shift">${otherBtn}</div><p>${d.failed ? '가사를 불러오지 못했어요' : '이 곡의 가사를 찾지 못했어요'}</p><div class="lyr-note">${esc(meta(t).artist)} · ${esc(meta(t).title)}</div></div>`;
+    el.innerHTML = `${top}<div class="lyr plain ${theme}"><div class="lyr-shift">${otherBtn}</div><p>${d.failed ? '가사를 불러오지 못했어요' : '이 곡의 가사를 찾지 못했어요'}</p><div class="lyr-note">${esc(meta(t).artist)} · ${esc(meta(t).title)}</div></div>`;
   }
 }
 const otherBtn = '<button data-act="lyricpick">다른 가사</button>';
 const LYRIC_WHY = { live: '라이브 영상이라 글로만 보여 줘요', length: '영상과 가사의 길이가 달라서 글로만 보여 줘요', untimed: '이 곡은 시간이 맞춰진 가사가 없어요' };
+
+function renderQuickLyrics() {
+  const el = $('#q-lyrics');
+  if (!el || !quickLyricsOpen) return;
+  el.hidden = false;
+  const theme = `theme-${lyricStyle()}`, t = current();
+  if (!t) {
+    quickLyr.key = null; quickLyr.data = null; quickLyr.at = -2;
+    el.innerHTML = `<div class="q-lyr ${theme}"><p>재생 중인 곡이 없어요</p></div>`;
+    return;
+  }
+  const key = lyricKey(t);
+  if (quickLyr.key !== key) {
+    Object.assign(quickLyr, { key, id: t.id, data: null, at: -2 });
+    el.innerHTML = `<div class="q-lyr ${theme}"><div class="q-lyr-meta"><b>${esc(meta(t).title)}</b><span>${esc(meta(t).artist)}</span></div><div class="q-lyr-lines"><p>가사를 찾는 중…</p></div></div>`;
+    fetchLyrics(t).then(d => {
+      if (quickLyr.key === key && quickLyricsOpen) { quickLyr.data = d; renderQuickLyrics(); }
+    });
+    return;
+  }
+  const d = quickLyr.data, m = meta(t);
+  const head = `<div class="q-lyr-meta"><b>${esc(m.title)}</b><span>${esc(m.artist)}</span></div>`;
+  if (!d || d.waiting) {
+    el.innerHTML = `<div class="q-lyr ${theme}">${head}<div class="q-lyr-lines"><p>가사를 찾는 중…</p></div></div>`;
+  } else if (d.lines?.length) {
+    el.innerHTML = `<div class="q-lyr ${theme}">${head}<div class="q-lyr-lines">${d.lines.map(l => `<p data-act="lyricline" data-t="${l.t}">${esc(l.x) || '…'}</p>`).join('')}<div class="q-lyr-note">가사 제공: LRCLIB</div></div></div>`;
+    tickQuickLyrics();
+  } else if (d.plain) {
+    el.innerHTML = `<div class="q-lyr ${theme}">${head}<div class="q-lyr-lines"><p>${esc(LYRIC_WHY[d.why] || '시간이 맞춰진 가사가 없어요')}</p>${d.plain.split('\n').map(x => `<p>${esc(x) || '&nbsp;'}</p>`).join('')}<div class="q-lyr-note">가사 제공: LRCLIB</div></div></div>`;
+  } else {
+    el.innerHTML = `<div class="q-lyr ${theme}">${head}<div class="q-lyr-lines"><p>${d.failed ? '가사를 불러오지 못했어요' : '이 곡의 가사를 찾지 못했어요'}</p></div></div>`;
+  }
+}
+function tickQuickLyrics() {
+  if (!quickOpen || !quickLyricsOpen || !quickLyr.data?.lines?.length) return;
+  const box = $('#q-lyrics .q-lyr-lines');
+  if (!box) return;
+  const i = lineAt(quickLyr.data.lines, curTime() + .25 + shiftOf(quickLyr.id));
+  if (i === quickLyr.at && box.querySelector('p.on')) return;
+  const smooth = quickLyr.at !== -2, ps = box.querySelectorAll('p'), p = ps[i];
+  quickLyr.at = i;
+  ps.forEach((x, k) => { x.classList.toggle('on', k === i); x.classList.toggle('past', k < i); });
+  if (p) p.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
+}
 
 // 다른 가사 고르기. 창을 연 곡에 적용한다 (창이 열린 사이에 다음 곡으로 넘어갈 수 있다)
 const lyricFind = { song: null, turn: 0 };
@@ -4867,6 +4976,7 @@ $('#main').addEventListener('wheel', () => {
 }, { passive: true });
 setInterval(tickLyrics, 250);
 setInterval(tickNpLyrics, 250);
+setInterval(tickQuickLyrics, 250);
 
 // ---------- 전체 화면 ----------
 // 같은 틀에서 위 바만 사라진다. 다른 화면에서 열었으면 닫을 때 그 화면으로 돌아간다
