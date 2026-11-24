@@ -942,6 +942,7 @@
     <div class="m-tr m-nav">
       <button class="m-pill" data-act="privateoff" id="b-private" title="비공개 세션 끄기" hidden><svg class="mi" aria-hidden="true"><use href="#i-lock"/></svg>비공개 세션</button>
       <button data-act="go" data-route="downloads" title="다운로드"><svg class="mi" aria-hidden="true"><use href="#m-download"/></svg></button>
+      <button data-act="proxy" title="웹 프록시" aria-label="웹 프록시"><svg class="mi" aria-hidden="true"><use href="#m-browse"/></svg></button>
       <button data-act="panel" data-panel="friends" id="b-friends" title="친구 활동"><svg class="mi" aria-hidden="true"><use href="#m-group"/></svg></button>
       <button class="m-me" data-act="memenu" title="내 메뉴"><span id="me-pic">나</span></button>
     </div>
@@ -1328,6 +1329,9 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 24일', [
+    '로그인과 기기 승인을 거친 뒤, 같은 탭에서 웹사이트와 브라우저 게임을 여는 실험용 웹 프록시 (별도 서버 설정 필요)',
+  ]],
   ['11월 23일', [
     '플레이리스트마다 공유 링크를 만들고, 링크를 받은 사람이 로그인 후 자기 보관함에 복사할 수 있음',
     'Ctrl+J 빠른 패널에서 재생 중인 영상과 자주 쓰는 재생 설정을 바로 열 수 있음',
@@ -3369,6 +3373,9 @@ function renderSettings(el) {
     <h2>검색</h2>
     ${setRow('검색 서버가 안 될 때 예비 검색 쓰기', '그때는 검색어가 아래 서버로 가요', boolBox('invidiousOn', store.settings.invidiousOn !== false))}
     <label class="set-col">예비 검색 서버<input type="text" data-setting="invidious" value="${esc(store.settings.invidious || '')}" placeholder="${esc(CONFIG.invidious)}"></label>
+    <h2>웹 프록시</h2>
+    <p class="m-hint">별도 클라우드 프록시 서버 주소를 저장하면 웹사이트와 브라우저 게임을 이 화면에서 열어요. 서버를 먼저 배포해야 사용할 수 있어요.</p>
+    <label class="set-col">HTTPS 프록시 서버 주소<input type="url" data-setting="proxyUrl" value="${esc(store.settings.proxyUrl || '')}" placeholder="https://your-proxy.onrender.com" autocomplete="url" spellcheck="false"></label>
     <h2>긴급 탈출</h2>
     <label class="set-col">긴급 탈출로 이동할 주소<input type="text" data-setting="panicUrl" value="${esc(store.settings.panicUrl || '')}" placeholder="${esc(CONFIG.panicUrl)}"></label>
     <h2>내 추천 기록</h2>
@@ -4249,6 +4256,25 @@ document.addEventListener('click', e => {
   }
   const a = el.dataset.act, key = el.dataset.list, i = +el.dataset.i, id = el.dataset.id;
   switch (a) {
+    case 'proxy': {
+      let origin = '';
+      try {
+        const url = new URL(String(store.settings.proxyUrl || '').trim());
+        if (url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) origin = url.origin;
+      } catch (_) {}
+      if (!origin) {
+        go({ name: 'settings' });
+        toast('설정에서 HTTPS 프록시 서버 주소를 먼저 저장해 주세요');
+        break;
+      }
+      try {
+        sessionStorage.setItem('sm.proxy.origin', origin);
+        location.assign('/proxy');
+      } catch (_) {
+        toast('프록시 화면을 열지 못했어요');
+      }
+      break;
+    }
     case 'go':
       go({ name: el.dataset.route, id: id || undefined });
       if (el.dataset.route === 'search') { $('#m-q').focus(); $('#m-q').select(); } // 뒤로 가기나 영상 닫기로 돌아올 때는 키를 뺏지 않는다
