@@ -1034,6 +1034,7 @@ const CONFIG = {
   // 기기 승인: 이 브라우저가 아직 승인돼 있나 (lovable/src/lib/device-gate.ts)
   meUrl: '/api/me',
   panicUrl: 'https://docs.google.com/document/u/0/',
+  proxyUrl: 'https://stealth-music-proxy.onrender.com',
 };
 
 const $ = s => document.querySelector(s);
@@ -3375,7 +3376,7 @@ function renderSettings(el) {
     <label class="set-col">예비 검색 서버<input type="text" data-setting="invidious" value="${esc(store.settings.invidious || '')}" placeholder="${esc(CONFIG.invidious)}"></label>
     <h2>웹 프록시</h2>
     <p class="m-hint">별도 클라우드 프록시 서버 주소를 저장하면 웹사이트와 브라우저 게임을 이 화면에서 열어요. 서버를 먼저 배포해야 사용할 수 있어요.</p>
-    <label class="set-col">HTTPS 프록시 서버 주소<input type="url" data-setting="proxyUrl" value="${esc(store.settings.proxyUrl || '')}" placeholder="https://your-proxy.onrender.com" autocomplete="url" spellcheck="false"></label>
+    <label class="set-col">HTTPS 프록시 서버 주소<input type="url" data-setting="proxyUrl" value="${esc(store.settings.proxyUrl || '')}" placeholder="${esc(CONFIG.proxyUrl || 'https://stealth-music-proxy.onrender.com')}" autocomplete="url" spellcheck="false"></label>
     <h2>긴급 탈출</h2>
     <label class="set-col">긴급 탈출로 이동할 주소<input type="text" data-setting="panicUrl" value="${esc(store.settings.panicUrl || '')}" placeholder="${esc(CONFIG.panicUrl)}"></label>
     <h2>내 추천 기록</h2>
@@ -4259,7 +4260,8 @@ document.addEventListener('click', e => {
     case 'proxy': {
       let origin = '';
       try {
-        const url = new URL(String(store.settings.proxyUrl || '').trim());
+        const raw = String(store.settings.proxyUrl || CONFIG.proxyUrl || '').trim();
+        const url = new URL(raw);
         if (url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) origin = url.origin;
       } catch (_) {}
       if (!origin) {
