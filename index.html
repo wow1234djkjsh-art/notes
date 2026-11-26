@@ -74,29 +74,39 @@
   .dc-note { color: #b3261e; font-size: 13px; margin: 0; padding: 0 16px; }
   .dc-note:empty { display: none; }
 
-  /* ---------- Alt 조작판: Alt를 누르는 동안만 뜨는 단일 판 ---------- */
-  /* 문서 위장 위에 겹치는 판이라 배경은 불투명하게 둔다. 카드 대신 괘선으로 묶고,
-     항목마다 아이콘 + 이름 + 한 줄 설명 + 키캡을 한 줄에 놓아 단축키를 몰라도 고를 수 있게 했다. */
-  #alt-pad { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 130; width: min(1080px, calc(100vw - 20px)); max-height: min(72vh, 560px); overflow: auto; background: #F2F4EE; color: #16211C; border: 1px solid rgba(15,92,85,.28); border-radius: 12px; box-shadow: 0 24px 60px rgba(8,20,16,.34); font: 13px/1.4 Figtree, "Noto Sans KR", "Malgun Gothic", Arial, sans-serif; }
+  /* ---------- Alt 조작판: Alt + ` 로 여는 판 ---------- */
+  /* 문서 위장 위에 겹치는 작은 판. 구글 문서의 단축키 창처럼 흰 바탕·얇은 선·왼쪽 이름·오른쪽 단축키.
+     아이콘은 문서 도구 모음과 같은 회색 16px 아이콘만 써서 색으로 튀지 않게 한다. */
+  #alt-pad { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 130; width: min(780px, calc(100vw - 24px)); max-height: min(72vh, 460px); display: flex; flex-direction: column; overflow: hidden; background: #fff; color: #1f1f1f; border: 1px solid #dadce0; border-radius: 8px; box-shadow: 0 1px 2px rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15); font: 12.5px/1.35 "Google Sans", Roboto, "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif; }
   #alt-pad[hidden] { display: none; }
-  #alt-pad .ap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 16px 10px; background: #E6EAE1; border-bottom: 1px solid rgba(15,92,85,.18); }
-  #alt-pad .ap-head strong { font-size: 13.5px; letter-spacing: -.01em; }
-  #alt-pad .ap-head span { font-size: 11.5px; color: #4C5B52; }
-  #alt-pad .ap-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(204px, 1fr)); }
-  #alt-pad .ap-g { padding: 10px 8px 12px 12px; border-left: 1px solid rgba(15,92,85,.14); }
-  #alt-pad .ap-g:first-child { border-left: 0; }
-  #alt-pad .ap-g h5 { margin: 2px 0 7px; font-size: 11px; font-weight: 700; color: #0F5C55; letter-spacing: .02em; }
-  #alt-pad .ap-b { display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; align-items: start; column-gap: 9px; width: 100%; background: none; border: 0; padding: 6px 6px 6px 4px; border-radius: 2px; cursor: pointer; text-align: left; color: inherit; font: inherit; word-break: keep-all; }
-  #alt-pad .ap-b:hover { background: rgba(15,92,85,.09); }
-  #alt-pad .ap-b:focus-visible { outline: 2px solid #0F5C55; outline-offset: -2px; }
-  #alt-pad .ap-i { width: 17px; height: 17px; margin-top: 2px; color: #0F5C55; }
-  #alt-pad .ap-t { display: block; min-width: 0; }
-  #alt-pad .ap-n { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #alt-pad .ap-d { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 11px; line-height: 1.35; color: #4C5B52; }
-  #alt-pad .kbd { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 76px; margin-top: 2px; }
-  #alt-pad .kbd kbd { min-width: 16px; padding: 0 5px; text-align: center; background: #FBFAF4; border: 1px solid rgba(15,92,85,.3); border-bottom-width: 2px; border-radius: 3px; color: #33443B; font: 600 10px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; }
-  #alt-pad .ap-b.danger .ap-i, #alt-pad .ap-b.danger .ap-n { color: #A3231B; }
-  #alt-pad .ap-b.danger .kbd kbd { border-color: rgba(163,35,27,.35); color: #A3231B; }
+  #alt-pad .ap-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 7px 6px 3px 14px; cursor: grab; user-select: none; touch-action: none; }
+  body.pad-moving #alt-pad .ap-head { cursor: grabbing; }
+  #alt-pad .ap-head strong { font-size: 13px; font-weight: 500; white-space: nowrap; }
+  #alt-pad .ap-head span { flex: 1 1 auto; min-width: 0; text-align: right; font-size: 11px; color: #5f6368; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #alt-pad .ap-x { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; color: #5f6368; font-size: 12px; line-height: 1; cursor: pointer; }
+  #alt-pad .ap-x:hover { background: rgba(60,64,67,.08); }
+  #alt-pad .ap-groups { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; display: grid; grid-template-columns: repeat(auto-fit, minmax(236px, 1fr)); column-gap: 10px; padding: 0 8px 9px; align-items: start; }
+  #alt-pad .ap-grip { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; color: #9aa0a6; opacity: .8; background: linear-gradient(135deg, transparent 0 42%, currentColor 42% 50%, transparent 50% 68%, currentColor 68% 76%, transparent 76%); }
+  #alt-pad .ap-g { padding: 0 0 5px; }
+  #alt-pad .ap-g h5 { margin: 0 6px; padding: 3px 0 4px; border-bottom: 1px solid #e8eaed; font-size: 11px; font-weight: 500; color: #202124; }
+  #alt-pad .ap-b { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; width: 100%; min-height: 26px; padding: 2px 6px; border: 0; border-radius: 4px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  #alt-pad .ap-b:hover { background: #f1f3f4; }
+  #alt-pad .ap-b:focus-visible { outline: 2px solid #1a73e8; outline-offset: -2px; }
+  #alt-pad .ap-i { width: 16px; height: 16px; fill: currentColor; color: #5f6368; }
+  #alt-pad .ap-n { display: block; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: keep-all; }
+  #alt-pad .kbd { white-space: nowrap; font-size: 11px; color: #5f6368; }
+  #alt-pad .kbd kbd { padding: 0; border: 0; background: none; color: inherit; font: inherit; }
+  #alt-pad .kbd kbd + kbd::before { content: " + "; color: #80868b; }
+  #alt-pad .ap-b.danger .ap-n, #alt-pad .ap-b.danger .kbd, #alt-pad .ap-b.danger .ap-i { color: #d93025; }
+  /* 음악 화면에서는 같은 구조를 어두운 색으로만 바꿔 화면과 붙여 준다 */
+  body.mode-music #alt-pad { background: #282828; color: #fff; border-color: rgba(255,255,255,.12); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  body.mode-music #alt-pad .ap-head span, body.mode-music #alt-pad .kbd, body.mode-music #alt-pad .ap-i { color: #b3b3b3; }
+  body.mode-music #alt-pad .ap-g h5 { color: #fff; border-bottom-color: rgba(255,255,255,.12); }
+  body.mode-music #alt-pad .ap-b:hover { background: rgba(255,255,255,.1); }
+  body.mode-music #alt-pad .ap-x { color: #b3b3b3; }
+  body.mode-music #alt-pad .ap-x:hover { background: rgba(255,255,255,.1); }
+  body.mode-music #alt-pad .ap-grip { color: #8a8a8a; }
+  body.mode-music #alt-pad .ap-b.danger .ap-n, body.mode-music #alt-pad .ap-b.danger .kbd, body.mode-music #alt-pad .ap-b.danger .ap-i { color: #f2726f; }
   .dc-form, form.dc-name { border-top: 1px solid #e3e3e3; padding: 12px; }
   form.dc-name label { display: block; margin-bottom: 6px; color: #444746; }
   .dc-form textarea, form.dc-name input { width: 100%; box-sizing: border-box; border: 1px solid #747775; border-radius: 4px; padding: 8px 10px; font: inherit; resize: none; outline: none; }
@@ -1329,7 +1339,7 @@ function downloadDoc() {
 // 단축키 목록 (Ctrl+/, 도움말 메뉴, 설정)
 const SHORTCUTS = [
   ['마우스만으로 쓰기', [
-    ['Alt 키 누르고 있기', '화면 아래 조작판이 떠요. 아이콘과 설명을 보고 누르면 되고, 떼면 닫혀요'],
+    ['Alt + `', '조작판을 열고 닫아요. 제목을 끌어 옮기고 오른쪽 아래 손잡이로 크기를 바꿀 수 있어요'],
   ]],
   ['키보드 필수 단축키 (간소화)', [
     ['Alt+P 또는 Alt+/', '웹 프록시 (게임·웹사이트) 즉시 열기'],
@@ -1340,6 +1350,10 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 26일', [
+    'Alt + ` 로 조작판을 열고 닫아요. 열어 둔 채 제목을 끌어 옮기고 오른쪽 아래 손잡이로 크기를 바꿀 수 있고, 바꾼 자리는 다음에도 그대로예요',
+    '조작판을 구글 문서 단축키 창처럼 흰 바탕과 얇은 선으로 다듬었어요. 항목은 아이콘·이름·단축키 한 줄로 줄여 판을 작게 유지하고, 설명은 마우스를 올리면 보여요. 음악 화면에서는 어두운 판으로 바뀌어요',
+  ]],
   ['11월 25일', [
     'Alt를 누르는 동안 화면 아래에 조작판이 하나 떠요. 재생·화면·이동·문서·안전 네 갈래를 한 판에 모았고, 항목마다 아이콘과 이름, 무엇이 되는지 한 줄 설명, 단축키가 함께 있어요',
     '문서 도구 모음 위에 뜨던 파란 점선 안내(문서 로고·돋보기·저장 상태·인쇄)를 없앴어요. 같은 기능은 모두 조작판에서 쓰고, 단축키 목록에서도 그 안내를 뺐어요',
@@ -1515,14 +1529,12 @@ document.addEventListener('click', e => {
   if (d.dataset.doc === 'logclose') $('#d-log').hidden = true;
   if (d.dataset.doc === 'takeover') location.reload();
 });
-// Alt를 누르고 있는 동안만 조작판을 띄운다 (떼면 숨김 → 문서 위장 유지)
+// Alt + ` 로 조작판을 열고 닫는다. 열어 둔 채 제목을 끌어 옮기고 크기를 바꿀 수 있다.
+// Alt 하나만 누르는 것으로는 아무것도 뜨지 않아 문서 위장은 그대로다.
 window.addEventListener('keydown', e => {
-  if (e.key !== 'Alt') return;
-  if (!e.repeat) showAltPad();
-});
-window.addEventListener('keyup', e => {
-  if (e.key !== 'Alt') return;
-  hideAltPad();
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.code !== 'Backquote') return;
+  e.preventDefault();
+  if (!e.repeat) toggleAltPad();
 });
 window.addEventListener('blur', () => hideAltPad());
 document.addEventListener('visibilitychange', () => { if (document.hidden) hideAltPad(); });
@@ -5351,10 +5363,11 @@ function escBack() {
 // 단축키를 모르는 사람도 마우스로 전부 쓸 수 있다. Alt를 떼면 사라져 위장은 그대로다.
 const altPad = $('#alt-pad');
 const inMusic = fn => () => { if (mode !== 'music') setMode('music'); fn(); };
-// [아이콘, 이름, 한 줄 설명, 단축키, 함수] — 설명은 "무엇이 되는지"를 그대로 적는다
+// [아이콘, 이름, 한 줄 설명, 단축키, 함수] — 설명은 마우스를 올리면 툴팁으로 보여 준다
+// 판은 한 줄에 아이콘·이름·단축키만 두어 작게 유지한다
 const ALT_PAD = [
   ['재생', [
-    ['m-play', '재생 / 일시정지', '지금 곡을 틀거나 멈춰요', ['Space', '['], togglePlay],
+    ['m-play', '재생 / 일시정지', '지금 곡을 틀거나 멈춰요', ['Space / ['], togglePlay],
     ['m-prev', '이전 곡', '앞에 있던 곡으로 돌아가요', ['Alt', ','], prev],
     ['m-next', '다음 곡', '다음 곡으로 넘겨요', ['Alt', '.'], skipNext],
     ['m-replay', '5초 뒤로', '재생 위치를 5초 되감아요', ['←'], () => seekBy(-5)],
@@ -5366,7 +5379,7 @@ const ALT_PAD = [
     ['m-volume-down', '소리 작게', '볼륨을 5씩 줄여요', ['↓'], () => setVolume(store.volume - 5)],
     ['m-volume', '소리 크게', '볼륨을 5씩 올려요', ['↑'], () => setVolume(store.volume + 5)],
     ['m-volume-off', '음소거', '소리를 껐다가 다시 켜요', ['M'], toggleMute],
-    ['m-heart', '좋아요', '이 곡을 좋아요에 넣어요', ['Alt', 'L'], () => { const t = current(); if (!t) return toast('툴고 있는 곡이 없어요'); toggleLike(t, curKind()); toast(isLiked(t.id, curKind()) ? '좋아요에 추가했어요' : '좋아요를 취소했어요'); }],
+    ['m-heart', '좋아요', '이 곡을 좋아요에 넣어요', ['Alt', 'L'], () => { const t = current(); if (!t) return toast('틀고 있는 곡이 없어요'); toggleLike(t, curKind()); toast(isLiked(t.id, curKind()) ? '좋아요에 추가했어요' : '좋아요를 취소했어요'); }],
     ['m-thumb-down', '싫어요', '이 곡을 추천에서 빼요', ['Alt', 'X'], dislikeCurrent],
   ]],
   ['화면', [
@@ -5398,13 +5411,71 @@ const ALT_PAD = [
   ]],
 ];
 function buildAltPad() {
-  altPad.innerHTML = '<div class="ap-head"><strong>Alt 조작판</strong><span>아무 버튼이나 눌러 실행 · Alt를 떼면 닫혀요</span></div><div class="ap-groups">' +
+  altPad.innerHTML = '<div class="ap-head"><strong>Alt 조작판</strong><span>끌어서 옮기기 · 오른쪽 아래로 크기 조절 · Alt + ` 닫기</span><button type="button" class="ap-x" title="닫기 (Alt + `)" aria-label="닫기">✕</button></div><div class="ap-groups">' +
     ALT_PAD.map(([title, items], gi) => `<div class="ap-g"><h5>${esc(title)}</h5>${items.map(([icon, label, desc, keys], i) =>
-      `<button type="button" class="ap-b${label === '긴급 탈출' ? ' danger' : ''}" data-g="${gi}" data-i="${i}" title="${esc(label)} — ${esc(desc)}"><svg class="ic ap-i"><use href="#${icon}"/></svg><span class="ap-t"><span class="ap-n">${esc(label)}</span><span class="ap-d">${esc(desc)}</span></span><span class="kbd">${keys.map(k => `<kbd>${esc(k)}</kbd>`).join('')}</span></button>`).join('')}</div>`).join('') +
-    '</div>';
+      `<button type="button" class="ap-b${label === '긴급 탈출' ? ' danger' : ''}" data-g="${gi}" data-i="${i}" title="${esc(label)} — ${esc(desc)}"><svg class="ap-i" aria-hidden="true"><use href="#${esc(icon)}"/></svg><span class="ap-n">${esc(label)}</span><span class="kbd">${keys.map(k => `<kbd>${esc(k)}</kbd>`).join('')}</span></button>`).join('')}</div>`).join('') +
+    '</div><div class="ap-grip" title="끌어서 크기 조절"></div>';
 }
-function showAltPad() { if (!altPad.innerHTML) buildAltPad(); altPad.hidden = false; }
+function showAltPad() { if (!altPad.innerHTML) buildAltPad(); altPad.hidden = false; placeAltPad(); }
 function hideAltPad() { altPad.hidden = true; }
+function toggleAltPad() { if (altPad.hidden) showAltPad(); else hideAltPad(); }
+// 열어 둔 판은 제목을 끌어 옮기고 오른쪽 아래 손잡이로 크기를 바꾼다. 바꾼 자리는 다음에도 그대로 쓴다
+const padFree = () => altPad.dataset.free === '1';
+function freeAltPad() {
+  if (padFree()) return;
+  const r = altPad.getBoundingClientRect();
+  altPad.dataset.free = '1';
+  altPad.style.left = r.left + 'px';
+  altPad.style.top = r.top + 'px';
+  altPad.style.width = r.width + 'px';
+  altPad.style.height = r.height + 'px';
+  altPad.style.bottom = 'auto';
+  altPad.style.transform = 'none';
+  altPad.style.maxHeight = 'none';
+}
+function placeAltPad() {
+  const b = store.settings.padBox;
+  if (!b || !altPad.innerHTML) return;
+  freeAltPad();
+  const w = clamp(b.w, 320, innerWidth - 12), h = clamp(b.h, 150, innerHeight - 12);
+  altPad.style.width = w + 'px';
+  altPad.style.height = h + 'px';
+  altPad.style.left = clamp(b.x, 4, Math.max(4, innerWidth - w - 4)) + 'px';
+  altPad.style.top = clamp(b.y, 4, Math.max(4, innerHeight - h - 4)) + 'px';
+}
+let padDrag = null;
+altPad.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  const grip = e.target.closest('.ap-grip'), head = e.target.closest('.ap-head');
+  if (!grip && (!head || e.target.closest('button'))) return;
+  e.preventDefault();
+  const r = altPad.getBoundingClientRect();
+  padDrag = grip ? { size: true, sx: e.clientX, sy: e.clientY, w: r.width, h: r.height }
+    : { size: false, sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, w: r.width, h: r.height };
+  freeAltPad();
+  document.body.classList.add('pad-moving');
+  try { altPad.setPointerCapture(e.pointerId); } catch (_) {}
+});
+addEventListener('pointermove', e => {
+  if (!padDrag) return;
+  const d = padDrag, dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+  if (d.size) {
+    altPad.style.width = clamp(d.w + dx, 320, innerWidth - 12) + 'px';
+    altPad.style.height = clamp(d.h + dy, 150, innerHeight - 12) + 'px';
+  } else {
+    altPad.style.left = clamp(d.x + dx, 4, Math.max(4, innerWidth - d.w - 4)) + 'px';
+    altPad.style.top = clamp(d.y + dy, 4, Math.max(4, innerHeight - d.h - 4)) + 'px';
+  }
+});
+addEventListener('pointerup', () => {
+  if (!padDrag) return;
+  padDrag = null;
+  document.body.classList.remove('pad-moving');
+  const r = altPad.getBoundingClientRect();
+  store.settings.padBox = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+  save();
+});
+addEventListener('resize', () => { if (padFree()) placeAltPad(); });
 // Alt를 누른 채로 버튼을 누를 수 있다. 버튼은 Alt 하나만으로도 눌리게 해 둔다.
 function clickAltPad(b) {
   const fn = ALT_PAD[+b.dataset.g]?.[1][+b.dataset.i]?.[4];
@@ -5437,6 +5508,7 @@ function onKey(e) {
   }
   if (e.key === 'Escape') {
     if (!$('#m-sug').hidden) e.preventDefault();
+    if (!altPad.hidden) { hideAltPad(); return; }   // 열어 둔 조작판이 있으면 그것부터 닫는다
     escBack();
     return;
   }
