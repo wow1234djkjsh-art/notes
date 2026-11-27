@@ -157,9 +157,22 @@
   .d-dialog td + td { text-align: right; }
   .d-dialog-btns { text-align: right; margin-top: 16px; }
   .d-dialog-btns button { background: #0b57d0; color: #fff; border-radius: 18px; padding: 8px 20px; font-size: 14px; }
+  /* 웹 프록시는 문서 캔버스 안에 '미리보기' 창으로 얹는다. 화면(주소)은 그대로라 방문 기록이 남지 않고,
+     주변의 문서 머리글·도구 막대가 그대로 보여 위장이 깨지지 않는다 */
+  #d-proxy { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: #fff; }
+  #d-proxy[hidden] { display: none; }
+  #doc.proxy-open .d-canvas { display: none; }
+  #d-proxy .dp-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 8px 0 16px; border-bottom: 1px solid #dadce0; background: #fff; color: #1f1f1f; font: 400 14px/1.2 Arial, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+  #d-proxy .dp-ic { flex: 0 0 auto; width: 15px; height: 20px; }
+  #d-proxy .dp-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5f6368; font-size: 12px; }
+  #d-proxy .dp-note button { padding: 0; border: 0; background: none; color: #0b57d0; font: inherit; text-decoration: underline; cursor: pointer; }
+  #d-proxy .dp-x { margin-left: auto; flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: #444746; font-size: 18px; line-height: 1; cursor: pointer; }
+  #d-proxy .dp-x:hover { background: #f1f3f4; }
+  #d-proxy .dp-body { flex: 1 1 auto; min-height: 0; background: #f9fbfd; }
+  #d-proxy .dp-body iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
   @media print {
     html, body { height: auto; overflow: visible; background: #fff; }
-    #music, #m-sug, #m-modal, #quick, #yt-wrap, #menu, #menu2, #toast, #d-pop, #d-count, #d-keys, #d-log, #d-tab, #d-chat, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
+    #music, #m-sug, #m-modal, #quick, #yt-wrap, #menu, #menu2, #toast, #d-pop, #d-count, #d-keys, #d-log, #d-tab, #d-chat, #d-proxy, .d-top, .d-tools, .d-ruler, .d-outline { display: none !important; }
     #doc, .d-canvas { display: block; height: auto; overflow: visible; background: #fff; }
     .d-pages { padding: 0; }
     .d-page { box-shadow: none; margin: 0; padding: 0; width: auto; max-width: none; min-height: 0; zoom: 1 !important; }
@@ -612,7 +625,7 @@
   .np-card h4 { margin: 0 0 12px; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .np-card h4 a { color: var(--sub); font-size: 14px; }
   .np-card h4 a:hover { color: #fff; text-decoration: underline; }
-  .np-lyr { position: relative; display: flex; flex-direction: column; box-sizing: border-box; height: 177px; background: var(--lc, #1f1f1f); transition: background-color .5s; }
+  .np-lyr { position: relative; display: flex; flex-direction: column; box-sizing: border-box; height: 177px; background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), var(--lc, #1f1f1f); transition: background-color .5s; }
   .np-lyr.open { height: 440px; }
   .np-lyr h4 { flex: none; height: 24px; margin-bottom: 8px; }
   .np-lb { display: flex; gap: 8px; margin-right: -4px; opacity: 0; transition: opacity .15s; }
@@ -670,7 +683,8 @@
   .m-form input { flex: 1; min-width: 0; background: var(--el2); border: 0; outline: 0; color: #fff; border-radius: 4px; padding: 0 10px; height: 36px; font-family: inherit; font-size: 14px; }
 
   /* 가사 */
-  .big-top { position: sticky; top: 0; z-index: 3; height: 64px; display: flex; align-items: center; gap: 16px; padding: 0 16px 0 32px; background: var(--hc); transition: background-color .5s; }
+  /* 표지 색은 곡마다 밝기가 달라서(--hc) 흰 글씨가 묻히기도 한다. 같은 색 위에 검은 막을 한 겹 씌워 밝기를 눌러 둔다 */
+  .big-top { position: sticky; top: 0; z-index: 3; height: 64px; display: flex; align-items: center; gap: 16px; padding: 0 16px 0 32px; background: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)), var(--hc); transition: background-color .5s; }
   .big-from { flex: 1 1 0; min-width: 0; font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .big-from a:hover { text-decoration: underline; }
   .big-tabs { flex: 0 1 auto; min-width: 0; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
@@ -680,7 +694,7 @@
   .big-btns { flex: none; display: flex; gap: 4px; }
   .big-btns button { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
   .big-btns button:hover { background: rgba(0,0,0,.3); }
-  .big-page { min-height: calc(100% - 64px); padding: 16px 32px 48px; background: var(--hc); transition: background-color .5s; }
+  .big-page { min-height: calc(100% - 64px); padding: 16px 32px 48px; background: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)), var(--hc); transition: background-color .5s; }
   .big-cover { display: block; width: min(calc(100vh - 280px), 640px, 100%); aspect-ratio: 1; object-fit: cover; margin: 0 auto; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.5); }
   .big-more { width: min(calc(100vh - 280px), 640px, 100%); margin: 48px auto 0; }
   .big-more h2 { margin: 0 0 16px; font-size: 24px; font-weight: 700; }
@@ -688,7 +702,7 @@
   .big-vid #video-slot { max-width: min(1400px, calc((100vh - 240px) * 16 / 9)); }
   .big-photo { background-size: cover; background-position: center 25%; background-repeat: no-repeat; }
   .big-photo.tall { background-size: contain; background-position: center; }
-  .lyr { min-height: calc(100% - 64px); padding: 40px 32px 120px; background: var(--hc); transition: background-color .5s; font-size: 32px; font-weight: 700; line-height: 1.35; letter-spacing: -.01em; }
+  .lyr { min-height: calc(100% - 64px); padding: 40px 32px 120px; background: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)), var(--hc); transition: background-color .5s; font-size: 32px; font-weight: 700; line-height: 1.35; letter-spacing: -.01em; }
   @container (min-width: 800px) { .lyr { font-size: 48px; } }
   @container (min-width: 1600px) { .lyr { font-size: 64px; } }
   .lyr p { margin: 0 0 .6em; max-width: 1024px; color: rgba(0,0,0,.65); cursor: pointer; transition: color .2s; user-select: text; word-break: keep-all; }
@@ -798,6 +812,8 @@
   .right button.on { color: var(--acc); }
   .right input[type=range] { max-width: 89px; flex: 0 1 89px !important; }
   @media (max-width: 1180px) { .right .opt { display: none; } }
+  /* 창이 1100px보다 좁아지면 가운데 검색이 줄어들 자리가 없어 오른쪽 아이콘들이 '영상 검색' 위로 올라탄다 */
+  @media (max-width: 1100px) { .m-top { grid-template-columns: auto minmax(0, 1fr) auto; } }
   @media (max-width: 1000px) {
     #music, #music.no-right { grid-template-columns: var(--lw) minmax(0, 1fr); }
     .m-right { position: fixed; right: 8px; top: 64px; bottom: 88px; width: min(320px, calc(100vw - 16px)); z-index: 25; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
@@ -949,6 +965,14 @@
     <span class="d-outline" title="문서 개요 표시"><svg class="ic"><use href="#i-toc"/></svg></span>
     <div class="d-pages"><div id="doc-page" class="d-page" contenteditable="true" spellcheck="false"></div></div>
   </div>
+  <div id="d-proxy" hidden>
+    <div class="dp-bar">
+      <svg class="dp-ic" viewBox="0 0 30 40" aria-hidden="true"><path d="M20 0H3a3 3 0 0 0-3 3v34a3 3 0 0 0 3 3h24a3 3 0 0 0 3-3V10z" fill="#4285f4"/><path d="M20 0v7a3 3 0 0 0 3 3h7z" fill="#a1c2fa"/><path d="M7 18h16v2.4H7zm0 5h16v2.4H7zm0 5h16v2.4H7zm0 5h10v2.4H7z" fill="#fff"/></svg>
+      <span>미리보기</span><span class="dp-note" id="d-proxy-note" role="status"></span>
+      <button type="button" class="dp-x" data-doc="proxyclose" title="닫기 (Esc)" aria-label="미리보기 닫기">✕</button>
+    </div>
+    <div class="dp-body" id="d-proxy-body"></div>
+  </div>
 </div>
 
 <!-- 음악 화면 (Alt+M) -->
@@ -1019,7 +1043,7 @@
 <div id="quick" hidden>
   <div class="q-resize" title="크기 조절"></div>
   <div class="q-head" title="끌어서 옮기기 · 두 번 누르면 원래 자리로"><span>빠른 메뉴</span><div class="q-actions"><button data-act="quickview" data-view="search" class="active" aria-pressed="true">검색</button><button data-act="quickview" data-view="lyrics" aria-pressed="false">가사</button><button data-act="quickview" data-view="video" aria-pressed="false">영상</button><button data-act="quickview" data-view="settings" aria-pressed="false">설정</button><button data-act="quickclose" title="닫기"><svg class="mi" aria-hidden="true"><use href="#m-close"/></svg></button></div></div>
-  <input type="text" id="q-input" autocomplete="off" spellcheck="false">
+  <input type="text" id="q-input" autocomplete="off" spellcheck="false" placeholder="곡, 아티스트, 앨범 검색" aria-label="곡, 아티스트, 앨범 검색">
   <ul id="q-results"></ul>
   <div id="q-lyrics" hidden></div>
   <div id="q-video" hidden></div>
@@ -1342,7 +1366,7 @@ const SHORTCUTS = [
     ['Alt + `', '조작판을 열고 닫아요. 제목을 끌어 옮기고 오른쪽 아래 손잡이로 크기를 바꿀 수 있어요'],
   ]],
   ['키보드 필수 단축키 (간소화)', [
-    ['Alt+P 또는 Alt+/', '웹 프록시 (게임·웹사이트) 즉시 열기'],
+    ['Alt+P 또는 Alt+/', '문서 안 미리보기 창으로 게임·웹사이트 열기'],
     ['Alt+M', '음악 화면 ↔ 문서 화면 전환'],
     ['Esc', '음악 화면에서 닥스 화면으로 즉시 탈출 (일시정지)'],
     ['Ctrl+/', '이 사용법 창 열기 / 닫기'],
@@ -1350,6 +1374,12 @@ const SHORTCUTS = [
 ];
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
+  ['11월 27일', [
+    '창을 좁히면 위쪽 아이콘들이 \'영상 검색\' 위로 올라타던 것을 고쳤어요. 이제는 검색칸이 먼저 줄어들어 자리를 비켜 줘요',
+    '표지 색이 밝은 곡에서 큰 화면(가사·아트워크) 위쪽 흰 글씨가 묻히던 것을 고쳤어요. 같은 색 위에 어두운 막을 한 겹 씌워 글씨를 읽을 수 있게 했어요',
+    '빠른 메뉴(Ctrl+J) 검색칸에 \'곡, 아티스트, 앨범 검색\' 안내를 넣었어요. 문서 단축키 창을 열어 둔 채 음악 화면으로 넘어가도 흰 창이 남지 않아요',
+    '웹 프록시를 별도 화면 대신 문서 안 \'미리보기\' 창에서 열어요. 주소가 바뀌지 않고 방문 기록에도 남지 않으며, 서버가 잠들었을 때는 준비 중 안내와 \'다시 시도\'가 나와요',
+  ]],
   ['11월 26일', [
     'Alt + ` 로 조작판을 열고 닫아요. 열어 둔 채 제목을 끌어 옮기고 오른쪽 아래 손잡이로 크기를 바꿀 수 있고, 바꾼 자리는 다음에도 그대로예요',
     '조작판을 구글 문서 단축키 창처럼 흰 바탕과 얇은 선으로 다듬었어요. 항목은 아이콘·이름·단축키 한 줄로 줄여 판을 작게 유지하고, 설명은 마우스를 올리면 보여요. 음악 화면에서는 어두운 판으로 바뀌어요',
@@ -1519,6 +1549,8 @@ document.addEventListener('click', e => {
   if (!d) return;
   if (d.dataset.doc === 'print') window.print();
   if (d.dataset.doc === 'proxy') openProxy();
+  if (d.dataset.doc === 'proxyclose') proxyClose();
+  if (d.dataset.doc === 'proxyretry') proxyConnect();
   if (d.dataset.doc === 'countclose') $('#d-count').hidden = true;
   if (d.dataset.doc === 'keys') showKeys();
   if (d.dataset.doc === 'keysclose') $('#d-keys').hidden = true;
@@ -1537,7 +1569,10 @@ window.addEventListener('keydown', e => {
   if (!e.repeat) toggleAltPad();
 });
 window.addEventListener('blur', () => hideAltPad());
-document.addEventListener('visibilitychange', () => { if (document.hidden) hideAltPad(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hideAltPad();
+  else if (!$('#d-proxy').hidden) proxyConnect(); // 다른 탭에 다녀오면 30분 세션을 다시 확인한다
+});
 
 sizeIn.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); hidePop(); applySize(+sizeIn.value); }
@@ -2553,6 +2588,9 @@ let mode = 'doc', quickOpen = false, quickLyricsOpen = false, quickVideoOpen = f
 function setMode(m) {
   mode = m;
   document.body.classList.toggle('mode-music', m === 'music');
+  // 문서 쪽 창(단축키·업데이트 내역·글자 수 등)은 화면을 바꾸면 닫는다. 열어 둔 채 넘어가면 반대쪽 화면 위에 흰 창이 남는다
+  ['#d-count', '#d-keys', '#d-log', '#d-tab'].forEach(s => { const e = $(s); if (e) e.hidden = true; });
+  if (m !== 'doc') { const pw = $('#d-proxy'); if (pw && !pw.hidden) proxyClose(); }
   $('#music').hidden = m !== 'music';
   if (m === 'music') setTimeout(maybeAskDaily, 0); else hideAsk();
   if (m === 'music') {
@@ -3434,7 +3472,7 @@ function renderSettings(el) {
     ${setRow('검색 서버가 안 될 때 예비 검색 쓰기', '그때는 검색어가 아래 서버로 가요', boolBox('invidiousOn', store.settings.invidiousOn !== false))}
     <label class="set-col">예비 검색 서버<input type="text" data-setting="invidious" value="${esc(store.settings.invidious || '')}" placeholder="${esc(CONFIG.invidious)}"></label>
     <h2>웹 프록시</h2>
-    <p class="m-hint">별도 클라우드 프록시 서버 주소를 저장하면 웹사이트와 브라우저 게임을 이 화면에서 열어요. 서버를 먼저 배포해야 사용할 수 있어요.</p>
+    <p class="m-hint">프록시 서버 주소를 저장하면 문서 안 '미리보기' 창에서 웹사이트와 브라우저 게임을 열어요. 화면과 주소가 그대로라 방문 기록에 남지 않아요.</p>
     <label class="set-col">HTTPS 프록시 서버 주소<input type="url" data-setting="proxyUrl" value="${esc(store.settings.proxyUrl || '')}" placeholder="${esc(CONFIG.proxyUrl || 'https://stealth-music-proxy.onrender.com')}" autocomplete="url" spellcheck="false"></label>
     <h2>긴급 탈출</h2>
     <label class="set-col">긴급 탈출로 이동할 주소<input type="text" data-setting="panicUrl" value="${esc(store.settings.panicUrl || '')}" placeholder="${esc(CONFIG.panicUrl)}"></label>
@@ -4303,26 +4341,96 @@ function addManyToPlaylist(p, tracks) {
   save(); toast(`'${p.name}'에 추가했어요`); renderAll();
 }
 
-// 프록시 화면(/proxy)은 로그인·기기 승인을 거친 티켓을 받아 연다. 주소는 설정 → 웹 프록시에서 바꿀 수 있다
-function openProxy() {
-  let origin = '';
+// ---------- 웹 프록시 ----------
+// 문서 캔버스 안에 '미리보기' 창으로 얹어 연다. 예전처럼 /proxy 화면으로 넘어가면 주소가 바뀌고 방문 기록에 남는다.
+// 로그인·기기 승인을 거친 2분짜리 티켓을 앱 서버에서 받아 프록시 서버의 30분 세션을 만든 뒤 그 안에서 연다.
+// 주소는 설정 → 웹 프록시에서 바꿀 수 있다.
+const PROXY_REFRESH_MS = 10 * 60 * 1000;
+const proxy = { origin: '', frame: null, busy: false, timer: 0, slow: 0, abort: null };
+function proxyOrigin() {
   try {
     const raw = String(store.settings.proxyUrl || CONFIG.proxyUrl || '').trim();
     const url = new URL(raw);
-    if (url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) origin = url.origin;
+    if (url.protocol === 'https:' && !url.username && !url.password && url.pathname === '/' && !url.search && !url.hash) return url.origin;
   } catch (_) {}
+  return '';
+}
+function proxyNote(html) { const n = $('#d-proxy-note'); if (n) n.innerHTML = html; }
+function proxyStop() {
+  clearInterval(proxy.timer); proxy.timer = 0;
+  clearTimeout(proxy.slow); proxy.slow = 0;
+  if (proxy.abort) { proxy.abort.abort(); proxy.abort = null; }
+  proxy.busy = false;
+}
+function proxyClose() {
+  proxyStop();
+  const win = $('#d-proxy');
+  if (win) win.hidden = true;
+  const doc = $('#doc');
+  if (doc) doc.classList.remove('proxy-open');
+  proxyNote('');
+}
+// 티켓 → 세션 쿠키 → 확인 순서. 렌더 무료 서버는 잠들면 첫 응답이 1분 가까이 걸려서 오래 기다리게 안내한다
+async function proxyConnect() {
+  const origin = proxy.origin, win = $('#d-proxy');
+  if (!origin || proxy.busy || !win || win.hidden) return;
+  proxy.busy = true;
+  const ctrl = proxy.abort = new AbortController();
+  const giveUp = setTimeout(() => ctrl.abort(), 75000);
+  clearTimeout(proxy.slow);
+  proxy.slow = setTimeout(() => { if (!win.hidden) proxyNote('서버를 준비하는 중이에요. 처음 한 번은 1분쯤 걸려요'); }, 6000);
+  try {
+    const ticketRes = await fetch('/api/proxy/ticket', { method: 'POST', credentials: 'same-origin', headers: { accept: 'application/json', 'content-type': 'application/json' }, body: JSON.stringify({ origin }), cache: 'no-store', signal: ctrl.signal });
+    const ticketData = await ticketRes.json().catch(() => ({}));
+    if (!ticketRes.ok || typeof ticketData.ticket !== 'string') throw new Error('ticket');
+    const sessionRes = await fetch(origin + '/api/session', { method: 'POST', mode: 'cors', credentials: 'include', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ticket: ticketData.ticket }), signal: ctrl.signal });
+    const sessionData = await sessionRes.json().catch(() => ({}));
+    if (!sessionRes.ok || sessionData.authenticated !== true) throw new Error('session');
+    const statusRes = await fetch(origin + '/api/session/status', { mode: 'cors', credentials: 'include', cache: 'no-store', signal: ctrl.signal });
+    if (!statusRes.ok) throw new Error('cookie');
+    if (!proxy.frame || proxy.frame.dataset.origin !== origin) {
+      if (proxy.frame) proxy.frame.remove();
+      const frame = document.createElement('iframe');
+      frame.title = '미리보기';
+      frame.dataset.origin = origin;
+      frame.referrerPolicy = 'no-referrer';
+      frame.allow = 'autoplay; fullscreen; gamepad; pointer-lock; clipboard-read; clipboard-write';
+      frame.setAttribute('allowfullscreen', '');
+      // 새 창·새 탭은 열지 않는다(방문 기록·주소 노출 방지). 같은 창 안에서만 움직인다
+      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-downloads allow-modals allow-pointer-lock allow-presentation');
+      frame.src = origin + '/';
+      $('#d-proxy-body').appendChild(frame);
+      proxy.frame = frame;
+    }
+    if (!win.hidden) proxyNote('');
+  } catch (_) {
+    if (!win.hidden) proxyNote('연결하지 못했어요. <button type="button" data-doc="proxyretry">다시 시도</button>');
+  } finally {
+    clearTimeout(giveUp); clearTimeout(proxy.slow);
+    if (proxy.abort === ctrl) proxy.abort = null;
+    proxy.busy = false;
+  }
+}
+function openProxy() {
+  const win = $('#d-proxy');
+  if (!win) return;
+  if (!win.hidden) { proxyClose(); return; } // Alt+P를 다시 누르면 닫힌다
+  const origin = proxyOrigin();
   if (!origin) {
     if (mode !== 'music') setMode('music');
     go({ name: 'settings' });
     toast('설정에서 HTTPS 프록시 서버 주소를 먼저 저장해 주세요');
     return;
   }
-  try {
-    sessionStorage.setItem('sm.proxy.origin', origin);
-    location.assign('/proxy');
-  } catch (_) {
-    toast('프록시 화면을 열지 못했어요');
-  }
+  if (mode !== 'doc') setMode('doc'); // 위장 화면 위에서만 연다
+  proxy.origin = origin;
+  try { sessionStorage.setItem('sm.proxy.origin', origin); } catch (_) {}
+  win.hidden = false;
+  $('#doc').classList.add('proxy-open');
+  proxyNote('불러오는 중…');
+  clearInterval(proxy.timer);
+  proxy.timer = setInterval(proxyConnect, PROXY_REFRESH_MS);
+  proxyConnect();
 }
 
 // ---------- 이벤트 ----------
@@ -5345,6 +5453,7 @@ $('#q-input').addEventListener('keydown', async e => {
 
 // ---------- Esc: 가장 앞에 뜬 창부터 하나씩 닫기 (Alt 조작판의 '닫기/뒤로' 버튼도 이걸 쓴다) ----------
 function escBack() {
+  if (!$('#d-proxy').hidden) return proxyClose();
   if (!$('#m-sug').hidden) return closeSug();
   if (!modalEl.hidden) return closeModal();
   if (fsOpen) return openFs(false);
@@ -5405,7 +5514,7 @@ const ALT_PAD = [
   ['문서 · 안전', [
     ['m-doc', '문서 ↔ 음악', '위장 화면과 음악 화면을 바꿔요', ['Alt', 'M'], () => setMode(mode === 'music' ? 'doc' : 'music')],
     ['m-lock', '긴급 탈출', '진짜 구글 문서로 나가요', ['Alt', 'K', 'Ctrl', 'X'], panic],
-    ['m-browse', '웹 프록시', '같은 탭에서 웹사이트를 열어요', ['Alt', 'P'], openProxy],
+    ['m-browse', '웹 프록시', '문서 안 미리보기 창에서 웹사이트를 열어요', ['Alt', 'P'], openProxy],
     ['m-menu', '단축키 창', '전체 단축키 목록을 봐요', ['Ctrl', '/'], showKeys],
     ['m-clock', '업데이트 내역', '무엇이 바뀌었는지 봐요', [], showLog],
   ]],
