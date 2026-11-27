@@ -1097,6 +1097,8 @@ const CONFIG = {
   meUrl: '/api/me',
   panicUrl: 'https://docs.google.com/document/u/0/',
   proxyUrl: 'https://stealth-music-proxy.onrender.com',
+  // 문서 안 '미리보기' 창을 열면 처음 뜨는 주소. 프록시 안에서 링크를 눌러 옮겨 다닐 수 있다
+  proxyStart: 'https://www.google.com/',
 };
 
 const $ = s => document.querySelector(s);
@@ -1384,6 +1386,8 @@ const CHANGELOG = [
     '표지 색이 밝은 곡에서 큰 화면(가사·아트워크) 위쪽 흰 글씨가 묻히던 것을 고쳤어요. 같은 색 위에 어두운 막을 한 겹 씌워 글씨를 읽을 수 있게 했어요',
     '빠른 메뉴(Ctrl+J) 검색칸에 \'곡, 아티스트, 앨범 검색\' 안내를 넣었어요. 문서 단축키 창을 열어 둔 채 음악 화면으로 넘어가도 흰 창이 남지 않아요',
     '웹 프록시를 별도 화면 대신 문서 안 \'미리보기\' 창에서 열어요. 주소가 바뀌지 않고 방문 기록에도 남지 않으며, 서버가 잠들었을 때는 준비 중 안내와 \'다시 시도\'가 나와요',
+    '미리보기가 안 열리던 것을 고쳤어요: 서드파티 창 안에서는 연결용 쿠키가 안 실려서 서버가 막고 있었어요. 이제 화면이 받은 세션을 연결 주소에 함께 넘기고, 서버의 스트림 제한 버그도 피해 가 그냥 열려요',
+    '미리보기 첫 화면의 검은 프록시 안내(로고·주소 입력창·저작권 줄)를 없앴어요. 이제 흰 문서 한 장처럼 보이고, 설정한 시작 주소(기본 구글)가 바로 열려요. 서버 주소·시작 주소는 설정 → 웹 프록시에서 바꿔요',
   ]],
   ['11월 26일', [
     'Alt + ` 로 조작판을 열고 닫아요. 열어 둔 채 제목을 끌어 옮기고 오른쪽 아래 손잡이로 크기를 바꿀 수 있고, 바꾼 자리는 다음에도 그대로예요',
@@ -3483,8 +3487,10 @@ function renderSettings(el) {
     ${setRow('검색 서버가 안 될 때 예비 검색 쓰기', '그때는 검색어가 아래 서버로 가요', boolBox('invidiousOn', store.settings.invidiousOn !== false))}
     <label class="set-col">예비 검색 서버<input type="text" data-setting="invidious" value="${esc(store.settings.invidious || '')}" placeholder="${esc(CONFIG.invidious)}"></label>
     <h2>웹 프록시</h2>
-    <p class="m-hint">프록시 서버 주소를 저장하면 문서 안 '미리보기' 창에서 웹사이트와 브라우저 게임을 열어요. 화면과 주소가 그대로라 방문 기록에 남지 않아요.</p>
+    <p class="m-hint">프록시 서버 주소를 저장하면 문서 안 '미리보기' 창에서 웹사이트와 브라우저 게임을 열어요. 시작 주소를 비우면 구글이 열리고, 거기서 링크를 눌러 옮겨 다닐 수 있어요. 화면과 주소가 그대로라 방문 기록에 남지 않아요.</p>
     <label class="set-col">HTTPS 프록시 서버 주소<input type="url" data-setting="proxyUrl" value="${esc(store.settings.proxyUrl || '')}" placeholder="${esc(CONFIG.proxyUrl || 'https://stealth-music-proxy.onrender.com')}" autocomplete="url" spellcheck="false"></label>
+    <label class="set-col">미리보기 시작 주소<input type="url" data-setting="proxyStart" value="${esc(store.settings.proxyStart || '')}" placeholder="${esc(CONFIG.proxyStart)}" autocomplete="url" spellcheck="false"></label>
+    ${proxyOrigin() ? `<p class="m-hint">미리보기는 오픈소스 프록시 구성 요소를 씁니다 · <a href="${esc(proxyOrigin())}/credits.html" target="_blank" rel="noreferrer">고지</a></p>` : ''}
     <h2>긴급 탈출</h2>
     <label class="set-col">긴급 탈출로 이동할 주소<input type="text" data-setting="panicUrl" value="${esc(store.settings.panicUrl || '')}" placeholder="${esc(CONFIG.panicUrl)}"></label>
     <h2>내 추천 기록</h2>
@@ -4380,7 +4386,15 @@ function addManyToPlaylist(p, tracks) {
 // 로그인·기기 승인을 거친 2분짜리 티켓을 앱 서버에서 받아 프록시 서버의 30분 세션을 만든 뒤 그 안에서 연다.
 // 주소는 설정 → 웹 프록시에서 바꿀 수 있다.
 const PROXY_REFRESH_MS = 10 * 60 * 1000;
-const proxy = { origin: '', frame: null, busy: false, timer: 0, slow: 0, abort: null };
+const proxy = { origin: '', frame: null, busy: false, timer: 0, slow: 0, abort: null, start: '' };
+// 미리보기 창이 처음 열 주소 (설정 → 웹 프록시). http/https 주소만 받는다
+function proxyStart() {
+  try {
+    const url = new URL(String(store.settings.proxyStart || CONFIG.proxyStart || '').trim());
+    if ((url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password) return url.toString();
+  } catch (_) {}
+  return CONFIG.proxyStart;
+}
 function proxyOrigin() {
   try {
     const raw = String(store.settings.proxyUrl || CONFIG.proxyUrl || '').trim();
@@ -4422,8 +4436,10 @@ async function proxyConnect() {
     if (!sessionRes.ok || sessionData.authenticated !== true) throw new Error('session');
     const statusRes = await fetch(origin + '/api/session/status', { mode: 'cors', credentials: 'include', cache: 'no-store', signal: ctrl.signal });
     if (!statusRes.ok) throw new Error('cookie');
-    if (!proxy.frame || proxy.frame.dataset.origin !== origin) {
+    const start = proxyStart();
+    if (!proxy.frame || proxy.frame.dataset.origin !== origin || proxy.start !== start) {
       if (proxy.frame) proxy.frame.remove();
+      proxy.start = start;
       const frame = document.createElement('iframe');
       frame.title = '미리보기';
       frame.dataset.origin = origin;
@@ -4432,7 +4448,8 @@ async function proxyConnect() {
       frame.setAttribute('allowfullscreen', '');
       // 새 창·새 탭은 열지 않는다(방문 기록·주소 노출 방지). 같은 창 안에서만 움직인다
       frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-downloads allow-modals allow-pointer-lock allow-presentation');
-      frame.src = origin + '/';
+      // 프록시 첫 화면에 시작 주소를 넘겨 주소 입력 없이 바로 연다
+      frame.src = origin + '/?u=' + encodeURIComponent(start);
       $('#d-proxy-body').appendChild(frame);
       proxy.frame = frame;
     }
