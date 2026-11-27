@@ -530,6 +530,9 @@
   .bio-card img { display: block; width: 100%; max-height: 400px; object-fit: cover; object-position: center 25%; }
   .bio-card p { margin: 0; padding: 24px; color: var(--sub); font-size: 16px; line-height: 1.5; }
   .trk[data-row]:hover { background: var(--hov); }
+  /* 키보드로 고른 곡 줄·카드에 테두리를 보여 준다 */
+  .trk[data-row]:focus-visible, .card:focus-visible, .top:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+  .trk[data-row]:focus-visible { background: var(--hov); }
   .trk.sel, .trk.sel:hover { background: rgba(255,255,255,.3) !important; color: #fff; }
   .trk.dropb { box-shadow: 0 -2px 0 var(--acc); }
   .trk.dropa { box-shadow: 0 2px 0 var(--acc); }
@@ -1368,6 +1371,7 @@ const SHORTCUTS = [
   ['키보드 필수 단축키 (간소화)', [
     ['Alt+P 또는 Alt+/', '문서 안 미리보기 창으로 게임·웹사이트 열기'],
     ['Alt+M', '음악 화면 ↔ 문서 화면 전환'],
+    ['↑ / ↓, Enter', '곡 줄로 옮겨 다니고 고른 곡을 재생해요 (Shift+F10: 곡 메뉴)'],
     ['Esc', '음악 화면에서 닥스 화면으로 즉시 탈출 (일시정지)'],
     ['Ctrl+/', '이 사용법 창 열기 / 닫기'],
   ]],
@@ -1375,6 +1379,7 @@ const SHORTCUTS = [
 // 업데이트 내역 (도움말 메뉴, 설정). 새 기능을 올리면 맨 위에 추가한다
 const CHANGELOG = [
   ['11월 27일', [
+    '곡 목록의 줄에 키보드로 초점을 옮길 수 있게 했어요. ↑/↓ 로 줄 사이를 다니고 Enter 로 재생하며, Shift+F10 이나 메뉴 키로 그 곡의 메뉴를 열어요. 초점이 있는 줄에는 흰 테두리가 보여요. 카드도 Tab 으로 골라 Enter 로 열 수 있어요',
     '창을 좁히면 위쪽 아이콘들이 \'영상 검색\' 위로 올라타던 것을 고쳤어요. 이제는 검색칸이 먼저 줄어들어 자리를 비켜 줘요',
     '표지 색이 밝은 곡에서 큰 화면(가사·아트워크) 위쪽 흰 글씨가 묻히던 것을 고쳤어요. 같은 색 위에 어두운 막을 한 겹 씌워 글씨를 읽을 수 있게 했어요',
     '빠른 메뉴(Ctrl+J) 검색칸에 \'곡, 아티스트, 앨범 검색\' 안내를 넣었어요. 문서 단축키 창을 열어 둔 채 음악 화면으로 넘어가도 흰 창이 남지 않아요',
@@ -2861,7 +2866,7 @@ const albumName = t => store.albums[t.id]?.n || '';
 const albumCell = t => { const a = store.albums[t.id]; return a?.id ? `<a data-act="go" data-route="album" data-id="${esc(a.id)}">${esc(a.n)}</a>` : esc(albumName(t)); };
 function trackRow(key, t, i, o) {
   const m = meta(t), k = esc(key), on = isLiked(t.id, listKind(key));
-  return `<div class="trk${isCur(t) ? ' cur' : ''}" data-row data-id="${esc(t.id)}" data-list="${k}" data-i="${i}" draggable="true">
+  return `<div class="trk${isCur(t) ? ' cur' : ''}" data-row data-id="${esc(t.id)}" data-list="${k}" data-i="${i}" draggable="true" tabindex="${i === 0 ? 0 : -1}">
     <span class="n"><span class="num">${o.no ?? i + 1}</span><button class="rp" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>
     <div class="tt">${o.pic === false ? '' : `<img src="${thumb(t.id)}" loading="lazy" alt="">`}<div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">${artistLinks(t)}</div></div></div>
     ${store.settings.compact ? `<span class="c-art">${artistLinks(t)}</span>` : ''}${o.album === false ? '' : `<span class="c-alb">${albumCell(t)}</span>`}${o.date ? `<span class="c-date">${esc(dateText(t.at))}</span>` : ''}
@@ -2896,11 +2901,11 @@ function actBar(key, o = {}) {
   </div>`;
 }
 // 카드
-const cardTrack = (key, t, i) => { const m = meta(t), k = esc(key); return `<div class="card" data-act="play" data-list="${k}" data-i="${i}" data-ctx="track"><div class="art"><img src="${thumb(t.id)}" alt="" loading="lazy"><button class="cplay" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button></div><div class="t1">${esc(m.title)}</div><div class="t2">${esc(artistText(t))}</div></div>`; };
-const cardPlaylist = p => `<div class="card" data-act="go" data-route="playlist" data-id="${p.id}" data-ctx="pl:${p.id}"><div class="art">${plArt(p)}${p.tracks.length ? `<button class="cplay" data-act="playpl" data-id="${p.id}" title="재생">${ic('play')}</button>` : ''}</div><div class="t1">${esc(p.name)}</div><div class="t2">${esc(p.desc || `${myName()} · ${p.tracks.length}곡`)}</div></div>`;
-const cardArtist = a => `<div class="card round" data-act="artist" data-id="${esc(a.name)}" data-ctx="ar:${esc(a.name)}"><div class="art">${a.t ? `<img src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`}<button class="cplay" data-act="playartist" data-id="${esc(a.name)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(shortName(a.name))}</div><div class="t2">아티스트</div></div>`;
-const cardAlbum = a => `<div class="card" data-act="go" data-route="album" data-id="${esc(a.id)}" data-ctx="al:${esc(a.id)}"><div class="art">${a.c ? `<img src="${esc(a.c)}" alt="" loading="lazy">` : `<span class="pic">${ic('note')}</span>`}<button class="cplay" data-act="playalbum" data-id="${esc(a.id)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(albumTitle(a.n))}</div><div class="t2">${esc([a.y, albumKind(a.n)].filter(Boolean).join(' · '))}</div></div>`;
-const cardMix = x => `<div class="card" data-act="radio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" data-sub="${esc(x.sub)}"><div class="art"><img src="${thumb(x.seed.id)}" alt="" loading="lazy"><button class="cplay" data-act="playradio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(x.label)}</div><div class="t2">${esc(x.sub)}</div></div>`;
+const cardTrack = (key, t, i) => { const m = meta(t), k = esc(key); return `<div class="card" tabindex="0" data-act="play" data-list="${k}" data-i="${i}" data-ctx="track"><div class="art"><img src="${thumb(t.id)}" alt="" loading="lazy"><button class="cplay" data-act="play" data-list="${k}" data-i="${i}" title="재생">${ic('play')}</button></div><div class="t1">${esc(m.title)}</div><div class="t2">${esc(artistText(t))}</div></div>`; };
+const cardPlaylist = p => `<div class="card" tabindex="0" data-act="go" data-route="playlist" data-id="${p.id}" data-ctx="pl:${p.id}"><div class="art">${plArt(p)}${p.tracks.length ? `<button class="cplay" data-act="playpl" data-id="${p.id}" title="재생">${ic('play')}</button>` : ''}</div><div class="t1">${esc(p.name)}</div><div class="t2">${esc(p.desc || `${myName()} · ${p.tracks.length}곡`)}</div></div>`;
+const cardArtist = a => `<div class="card round" tabindex="0" data-act="artist" data-id="${esc(a.name)}" data-ctx="ar:${esc(a.name)}"><div class="art">${a.t ? `<img src="${thumb(a.t.id)}" alt="" loading="lazy">` : `<span class="pic">${ic('person')}</span>`}<button class="cplay" data-act="playartist" data-id="${esc(a.name)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(shortName(a.name))}</div><div class="t2">아티스트</div></div>`;
+const cardAlbum = a => `<div class="card" tabindex="0" data-act="go" data-route="album" data-id="${esc(a.id)}" data-ctx="al:${esc(a.id)}"><div class="art">${a.c ? `<img src="${esc(a.c)}" alt="" loading="lazy">` : `<span class="pic">${ic('note')}</span>`}<button class="cplay" data-act="playalbum" data-id="${esc(a.id)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(albumTitle(a.n))}</div><div class="t2">${esc([a.y, albumKind(a.n)].filter(Boolean).join(' · '))}</div></div>`;
+const cardMix = x => `<div class="card" tabindex="0" data-act="radio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" data-sub="${esc(x.sub)}"><div class="art"><img src="${thumb(x.seed.id)}" alt="" loading="lazy"><button class="cplay" data-act="playradio" data-id="${esc(x.seed.id)}" data-label="${esc(x.label)}" title="재생">${ic('play')}</button></div><div class="t1">${esc(x.label)}</div><div class="t2">${esc(x.sub)}</div></div>`;
 const shelf = (title, inner, more) => `<section class="shelf"><div class="shelf-h"><h2>${more ? `<a data-act="go" data-route="shelf" data-id="${more}">${esc(title)}</a>` : esc(title)}</h2>${more ? `<a class="more" data-act="go" data-route="shelf" data-id="${more}">모두 표시</a>` : ''}</div><div class="row1">${inner}</div></section>`;
 
 // 내 기록에서 만드는 목록
@@ -3014,8 +3019,8 @@ function renderSearch(el) {
     lists.search = res;
     const hit = artists.find(a => sameArtist(a.name, s.q)), t = res[0], m = meta(t);
     const band = hit
-      ? `<div class="top ar" data-act="go" data-route="artist" data-id="${esc(hit.name)}"><img src="${thumb(hit.t.id)}" alt=""><div class="tx"><div class="t1">${esc(shortName(hit.name))}</div><div class="t2">아티스트</div></div>${followBtn(hit.name)}<button class="cplay" data-act="playartist" data-id="${esc(hit.name)}" title="재생">${ic('play')}</button></div>`
-      : `<div class="top" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(artistText(t))}` : ''}</div></div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div>`;
+      ? `<div class="top ar" tabindex="0" data-act="go" data-route="artist" data-id="${esc(hit.name)}"><img src="${thumb(hit.t.id)}" alt=""><div class="tx"><div class="t1">${esc(shortName(hit.name))}</div><div class="t2">아티스트</div></div>${followBtn(hit.name)}<button class="cplay" data-act="playartist" data-id="${esc(hit.name)}" title="재생">${ic('play')}</button></div>`
+      : `<div class="top" tabindex="0" data-act="play" data-list="search" data-i="0" data-ctx="track"><img src="${thumb(t.id)}" alt=""><div class="tx"><div class="t1">${esc(m.title)}</div><div class="t2">곡${m.artist ? ` · ${esc(artistText(t))}` : ''}</div></div><button class="cplay" data-act="play" data-list="search" data-i="0" title="재생">${ic('play')}</button></div>`;
     const mixArtist = a => `<div class="mix-art" data-act="go" data-route="artist" data-id="${esc(a.name)}"><div class="tt"><img src="${thumb(a.t.id)}" alt="" loading="lazy"><div class="tx"><div class="t1">${esc(shortName(a.name))}</div><div class="t2">아티스트</div></div></div>${followBtn(a.name)}</div>`;
     const others = artists.filter(a => a !== hit).slice(0, 6), mixed = [];
     res.forEach((x, i) => {
@@ -3190,7 +3195,13 @@ function paintAlbumsSoon() {
   albumPaintT = setTimeout(() => {
     const a = document.activeElement;
     if (drag || (a?.matches('input, textarea') && $('#main').contains(a))) return paintAlbumsSoon();
+    const keep = a?.closest?.('#main .trk[data-row]');
     renderMain();
+    // 다시 그려도 키보드로 고른 줄에서 초점을 잃지 않는다
+    if (keep) {
+      const again = document.querySelector(`#main .trk[data-row][data-list="${CSS.escape(keep.dataset.list)}"][data-i="${keep.dataset.i}"]`);
+      if (again) { again.tabIndex = 0; again.focus({ preventScroll: true }); }
+    }
   }, 300);
 }
 
@@ -4116,6 +4127,29 @@ function paintSel() { document.querySelectorAll('#main .trk[data-row]').forEach(
 function setSel(key, idx) { sel.key = key; sel.set = new Set(idx); sel.anchor = idx.length ? idx[idx.length - 1] : -1; paintSel(); }
 const clearSel = () => { if (sel.set.size) setSel(null, []); };
 const selTracks = () => [...sel.set].sort((a, b) => a - b).map(i => lists[sel.key]?.[i]).filter(Boolean);
+// 키보드로 곡 고르기: 목록 하나에 탭 자리는 한 줄만 두고(roving tabindex) 위/아래로 옮긴다
+const rowSiblings = row => [...document.querySelectorAll('#main .trk[data-row]')].filter(r => r.dataset.list === row.dataset.list);
+function focusRow(row, step) {
+  const rows = rowSiblings(row), next = rows[rows.indexOf(row) + step];
+  if (!next) return;
+  for (const r of rows) r.tabIndex = -1;
+  next.tabIndex = 0;
+  next.focus();
+  next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function rowMenu(row) {
+  const key = row.dataset.list, i = +row.dataset.i;
+  if (!(sel.key === key && sel.set.has(i))) setSel(key, [i]);
+  const r = row.getBoundingClientRect();
+  showMenu({ x: r.left + 24, y: r.top + r.height / 2 }, key, i);
+  $('#menu button')?.focus();
+}
+// 초점이 온 줄이 그 목록의 탭 자리를 가진다(다시 그려도 첫 줄로 돌아간다)
+$('#main').addEventListener('focusin', e => {
+  const row = e.target.closest?.('.trk[data-row]');
+  if (!row) return;
+  for (const r of rowSiblings(row)) r.tabIndex = r === row ? 0 : -1;
+});
 function rowClick(row, e) {
   const key = row.dataset.list, i = +row.dataset.i;
   if (matchMedia('(hover: none)').matches) return playFrom(key, i); // 터치 화면은 두 번 누르기가 불편하다
@@ -5599,6 +5633,15 @@ function onKey(e) {
   const isSlash = e.code === 'Slash' || e.key === '/';
   const isM = e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.key === 'ㅡ';
   const typing = (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== 'range') || e.target.isContentEditable;
+  // 초점이 곡 줄이나 카드에 있을 때: 키보드만으로 곡을 고른다
+  const keyRow = !typing && document.activeElement?.closest?.('#main .trk[data-row]');
+  if (keyRow && !e.altKey && !e.ctrlKey && !e.metaKey) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); focusRow(keyRow, e.key === 'ArrowDown' ? 1 : -1); return; }
+    if (e.key === 'Enter') { e.preventDefault(); playFrom(keyRow.dataset.list, +keyRow.dataset.i); return; }
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) { e.preventDefault(); rowMenu(keyRow); return; }
+  }
+  const keyCard = !typing && document.activeElement?.closest?.('#main .card[data-act], #main .top[data-act]');
+  if (keyCard && !e.altKey && !e.ctrlKey && !e.metaKey && e.key === 'Enter') { e.preventDefault(); keyCard.click(); return; }
 
   if (e.altKey && !e.ctrlKey && !e.metaKey && isM) { e.preventDefault(); setMode(mode === 'music' ? 'doc' : 'music'); return; }
   if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && (isP || isSlash)) { e.preventDefault(); openProxy(); return; }
