@@ -1538,6 +1538,14 @@ document.addEventListener('mousedown', e => {
   if (e.target === sizeIn) { showPop('size', sizeIn); return; }
   if (!e.target.closest('#d-pop')) hidePop();
 });
+// 미리보기(프록시) 화면이 대상을 못 열면 알려 온다. 띠에 '다시 시도'를 띄워 새 세션으로 다시 열게 한다
+window.addEventListener('message', e => {
+  if (!proxy.frame || e.source !== proxy.frame.contentWindow) return;
+  if (e.data && e.data.smProxy === 'error' && $('#d-proxy') && !$('#d-proxy').hidden) {
+    proxyNote('미리보기를 열지 못했어요. <button type="button" data-doc="proxyretry">다시 시도</button>');
+  }
+});
+
 document.addEventListener('click', e => {
   if (e.altKey) {
     const s = e.target.closest('[data-stealth]');
@@ -1559,7 +1567,7 @@ document.addEventListener('click', e => {
   if (d.dataset.doc === 'print') window.print();
   if (d.dataset.doc === 'proxy') openProxy();
   if (d.dataset.doc === 'proxyclose') proxyClose();
-  if (d.dataset.doc === 'proxyretry') proxyConnect();
+  if (d.dataset.doc === 'proxyretry') { proxy.force = true; proxyConnect(); }
   if (d.dataset.doc === 'countclose') $('#d-count').hidden = true;
   if (d.dataset.doc === 'keys') showKeys();
   if (d.dataset.doc === 'keysclose') $('#d-keys').hidden = true;
@@ -4386,7 +4394,7 @@ function addManyToPlaylist(p, tracks) {
 // 로그인·기기 승인을 거친 2분짜리 티켓을 앱 서버에서 받아 프록시 서버의 30분 세션을 만든 뒤 그 안에서 연다.
 // 주소는 설정 → 웹 프록시에서 바꿀 수 있다.
 const PROXY_REFRESH_MS = 10 * 60 * 1000;
-const proxy = { origin: '', frame: null, busy: false, timer: 0, slow: 0, abort: null, start: '' };
+const proxy = { origin: '', frame: null, busy: false, timer: 0, slow: 0, abort: null, start: '', session: '', force: false };
 // 미리보기 창이 처음 열 주소 (설정 → 웹 프록시). http/https 주소만 받는다
 function proxyStart() {
   try {
@@ -4436,10 +4444,15 @@ async function proxyConnect() {
     if (!sessionRes.ok || sessionData.authenticated !== true) throw new Error('session');
     const statusRes = await fetch(origin + '/api/session/status', { mode: 'cors', credentials: 'include', cache: 'no-store', signal: ctrl.signal });
     if (!statusRes.ok) throw new Error('cookie');
+    const statusData = await statusRes.json().catch(() => ({}));
+    const session = typeof statusData.session === 'string' ? statusData.session : '';
     const start = proxyStart();
-    if (!proxy.frame || proxy.frame.dataset.origin !== origin || proxy.start !== start) {
+    // 무료 서버는 다시 뜨면 메모리의 세션이 사라진다. 세션이 바뀌었거나 '다시 시도'를 눌렀으면
+    // 미리보기를 새 세션으로 다시 열어야 한다(그대로 두면 옛 세션의 오류 화면에 갇힌다)
+    if (!proxy.frame || proxy.frame.dataset.origin !== origin || proxy.start !== start || proxy.force || proxy.session !== session) {
       if (proxy.frame) proxy.frame.remove();
       proxy.start = start;
+      proxy.session = session;
       const frame = document.createElement('iframe');
       frame.title = '미리보기';
       frame.dataset.origin = origin;
@@ -4448,12 +4461,14 @@ async function proxyConnect() {
       frame.setAttribute('allowfullscreen', '');
       // 새 창·새 탭은 열지 않는다(방문 기록·주소 노출 방지). 같은 창 안에서만 움직인다
       frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-downloads allow-modals allow-pointer-lock allow-presentation');
-      // 프록시 첫 화면에 시작 주소를 넘겨 주소 입력 없이 바로 연다
-      frame.src = origin + '/?u=' + encodeURIComponent(start);
+      // 프록시 첫 화면에 시작 주소를 넘겨 주소 입력 없이 바로 연다.
+      // 세션은 주소 조각(#)으로 넘겨 서버 기록·로그에 남기지 않는다
+      frame.src = origin + '/?u=' + encodeURIComponent(start) + (session ? '#s=' + encodeURIComponent(session) : '');
       $('#d-proxy-body').appendChild(frame);
       proxy.frame = frame;
     }
     if (!win.hidden) proxyNote('');
+    proxy.force = false;
   } catch (_) {
     if (!win.hidden) proxyNote('연결하지 못했어요. <button type="button" data-doc="proxyretry">다시 시도</button>');
   } finally {
